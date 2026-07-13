@@ -271,6 +271,40 @@ const TOOLS = {
     return `Note saved: ${subdir}/${filename} (${synced})`;
   },
 
+  // Read-only view of the second brain: a folder/file tree of the vault.
+  // Lists directories and .md notes (skips .git). Never writes anything.
+  brain_list: async ({ subdir, depth } = {}) => {
+    const cleanSub = (subdir || "").replace(/[^A-Za-z0-9/_-]/g, "");
+    const root     = cleanSub ? path.join(BRAIN_ROOT, cleanSub) : BRAIN_ROOT;
+    const maxDepth = Math.min(parseInt(depth, 10) || 3, 6);
+    const lines    = [];
+    let dirs = 0, files = 0;
+
+    async function walk(dir, prefix, d) {
+      if (d > maxDepth) return;
+      let entries;
+      try { entries = await fs.readdir(dir, { withFileTypes: true }); }
+      catch (e) { return; }
+      entries = entries
+        .filter(e => e.name !== ".git")
+        .sort((a, b) => (Number(b.isDirectory()) - Number(a.isDirectory())) || a.name.localeCompare(b.name));
+      for (const e of entries) {
+        if (e.isDirectory()) {
+          dirs++;
+          lines.push(`${prefix}📁 ${e.name}/`);
+          await walk(path.join(dir, e.name), prefix + "   ", d + 1);
+        } else if (e.name.endsWith(".md")) {
+          files++;
+          lines.push(`${prefix}📄 ${e.name}`);
+        }
+      }
+    }
+
+    await walk(root, "", 1);
+    const header = `${cleanSub || "brain"}/  (${dirs} carpeta(s), ${files} nota(s))`;
+    return lines.length ? `${header}\n${lines.join("\n")}` : `${header}\n(vacío)`;
+  },
+
   ollama_chat: async (args) => ollamaChat(args),
 
   claude_chat: async ({ prompt, system, max_tokens, temperature }) => {

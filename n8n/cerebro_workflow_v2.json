@@ -248,6 +248,23 @@
               },
               "renameOutput": true,
               "outputKey": "plan_cancel"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "BRAIN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "brain"
             }
           ]
         },
@@ -402,7 +419,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nlet text = (d.raw_text || '').trim();\nconst lower = text.toLowerCase();\nconst chatKey = String(d.chat_id);\n\n// ── Pending /plan confirmation state (persisted in workflow static data) ──────\nconst staticData = $getWorkflowStaticData('global');\nstaticData.pendingPlans = staticData.pendingPlans || {};\nconst pending = staticData.pendingPlans[chatKey];\n\nfunction emit(route, intent, extra) {\n  return [{ json: Object.assign({\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: true,\n    route: route,\n    intent: intent,\n    confidence: 1,\n    use_claude: route === 'CLAUDE'\n  }, extra || {}) }];\n}\n\nif (pending && Array.isArray(pending.tasks) && pending.tasks.length) {\n  const confirmRe = /^(ok(ey|ay)?|oka|s[ií]|vale|listo|dale|yes|yep|confirm(ar)?|crear|create|hazlo|adelante)(?=$|[\\s,.!;:])/i;\n  const cancelRe  = /^(no|cancel(ar|a)?|descartar?|olv[ií]dalo|nada)(?=$|[\\s,.!;:])/i;\n  const nums = (text.match(/\\d+/g) || []).map(function (n) { return parseInt(n, 10); });\n  const onlyNums = /^[\\s\\d,.]+$/.test(text) && nums.length > 0;\n\n  if (cancelRe.test(text)) {\n    return emit('PLAN_CANCEL', 'PLAN_CANCEL');\n  }\n  if (confirmRe.test(text) || onlyNums) {\n    let tasks = pending.tasks;\n    if (nums.length) tasks = nums.map(function (i) { return pending.tasks[i - 1]; }).filter(Boolean);\n    if (!tasks.length) tasks = pending.tasks;\n    return emit('PLAN_CONFIRM', 'PLAN_CONFIRM', { tasks: tasks });\n  }\n  // Any other message abandons the pending plan and is routed normally.\n  delete staticData.pendingPlans[chatKey];\n}\n\n// ── Slash commands go straight to an agent (skip the qwen classifier) ─────────\nconst SLASH = { '/claude':'CLAUDE', '/task':'TASK', '/note':'NOTE', '/content':'CONTENT', '/progress':'PROGRESS', '/qwen':'CHAT', '/chat':'CHAT', '/plan':'PLAN' };\nlet decided = false, route = null;\nconst m = lower.match(/^(\\/[a-z]+)\\b/);\nif (m && SLASH[m[1]]) {\n  route = SLASH[m[1]];\n  decided = true;\n  text = text.slice(m[1].length).trim();   // strip the command token\n}\n\n// Very large prompts go straight to Claude (skip classification).\nconst MAX_LOCAL_CHARS = 1500;\nif (!decided && text.length > MAX_LOCAL_CHARS) { route = 'CLAUDE'; decided = true; }\n\nconst intent = route === 'CLAUDE' ? 'TECHNICAL_QUERY' : (route || 'CHAT');\nreturn [{\n  json: {\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: decided,\n    route: decided ? route : null,\n    intent: decided ? intent : null,\n    confidence: decided ? 1 : null,\n    use_claude: decided ? (route === 'CLAUDE') : false\n  }\n}];"
+        "jsCode": "const d = $input.first().json;\nlet text = (d.raw_text || '').trim();\nconst lower = text.toLowerCase();\nconst chatKey = String(d.chat_id);\n\n// ── Pending /plan confirmation state (persisted in workflow static data) ──────\nconst staticData = $getWorkflowStaticData('global');\nstaticData.pendingPlans = staticData.pendingPlans || {};\nconst pending = staticData.pendingPlans[chatKey];\n\nfunction emit(route, intent, extra) {\n  return [{ json: Object.assign({\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: true,\n    route: route,\n    intent: intent,\n    confidence: 1,\n    use_claude: route === 'CLAUDE'\n  }, extra || {}) }];\n}\n\nif (pending && Array.isArray(pending.tasks) && pending.tasks.length) {\n  const confirmRe = /^(ok(ey|ay)?|oka|s[ií]|vale|listo|dale|yes|yep|confirm(ar)?|crear|create|hazlo|adelante)(?=$|[\\s,.!;:])/i;\n  const cancelRe  = /^(no|cancel(ar|a)?|descartar?|olv[ií]dalo|nada)(?=$|[\\s,.!;:])/i;\n  const nums = (text.match(/\\d+/g) || []).map(function (n) { return parseInt(n, 10); });\n  const onlyNums = /^[\\s\\d,.]+$/.test(text) && nums.length > 0;\n\n  if (cancelRe.test(text)) {\n    return emit('PLAN_CANCEL', 'PLAN_CANCEL');\n  }\n  if (confirmRe.test(text) || onlyNums) {\n    let tasks = pending.tasks;\n    if (nums.length) tasks = nums.map(function (i) { return pending.tasks[i - 1]; }).filter(Boolean);\n    if (!tasks.length) tasks = pending.tasks;\n    return emit('PLAN_CONFIRM', 'PLAN_CONFIRM', { tasks: tasks });\n  }\n  // Any other message abandons the pending plan and is routed normally.\n  delete staticData.pendingPlans[chatKey];\n}\n\n// ── Slash commands go straight to an agent (skip the qwen classifier) ─────────\nconst SLASH = { '/claude':'CLAUDE', '/task':'TASK', '/note':'NOTE', '/content':'CONTENT', '/progress':'PROGRESS', '/qwen':'CHAT', '/chat':'CHAT', '/plan':'PLAN', '/show_brain':'BRAIN', '/brain':'BRAIN' };\nlet decided = false, route = null;\nconst m = lower.match(/^(\\/[a-z_]+)(?=$|\\s)/);\nif (m && SLASH[m[1]]) {\n  route = SLASH[m[1]];\n  decided = true;\n  text = text.slice(m[1].length).trim();   // strip the command token\n}\n\n// Very large prompts go straight to Claude (skip classification).\nconst MAX_LOCAL_CHARS = 1500;\nif (!decided && text.length > MAX_LOCAL_CHARS) { route = 'CLAUDE'; decided = true; }\n\nconst intent = route === 'CLAUDE' ? 'TECHNICAL_QUERY' : (route || 'CHAT');\nreturn [{\n  json: {\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: decided,\n    route: decided ? route : null,\n    intent: decided ? intent : null,\n    confidence: decided ? 1 : null,\n    use_claude: decided ? (route === 'CLAUDE') : false\n  }\n}];"
       },
       "id": "fast-route",
       "name": "Fast route",
@@ -457,7 +474,7 @@
         360
       ],
       "parameters": {
-        "jsCode": "// Turn the incoming message into a note payload for Hermes note_save.\nconst d = $('Parse intent').first().json;\nconst text = (d.raw_text || '').trim();\nconst nl = text.indexOf('\\n');\nconst title = (nl === -1 ? text : text.slice(0, nl)).slice(0, 120) || 'Quick note';\nconst body = { title, content: text, folder: 'Inbox', tags: ['cerebro'], sync: true };\nreturn [{ json: { requestBody: JSON.stringify(body) } }];"
+        "jsCode": "// Turn the incoming message into a note payload for Hermes note_save.\n// Supports routing tokens anywhere in the text:\n//   @folder  -> target folder (e.g. @proyectos). Defaults to Inbox.\n//   #tag     -> extra tags (e.g. #k3s #idea). 'cerebro' is always added.\nconst d = $('Parse intent').first().json;\nlet text = (d.raw_text || '').trim();\n\n// Extract the first @folder token (letters, digits, _, -, /).\nlet folder = 'Inbox';\nconst folderMatch = text.match(/(?:^|\\s)@([A-Za-z0-9_\\/-]+)/);\nif (folderMatch) folder = folderMatch[1];\n\n// Extract all #tags.\nconst tags = ['cerebro'];\nconst tagRe = /(?:^|\\s)#([A-Za-z0-9_\\/-]+)/g;\nlet tm;\nwhile ((tm = tagRe.exec(text)) !== null) {\n  if (!tags.includes(tm[1])) tags.push(tm[1]);\n}\n\n// Strip the routing tokens from the body and tidy whitespace.\ntext = text\n  .replace(/(?:^|\\s)@[A-Za-z0-9_\\/-]+/g, ' ')\n  .replace(/(?:^|\\s)#[A-Za-z0-9_\\/-]+/g, ' ')\n  .replace(/[ \\t]{2,}/g, ' ')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\n\nconst nl = text.indexOf('\\n');\nconst title = (nl === -1 ? text : text.slice(0, nl)).slice(0, 120) || 'Quick note';\nconst body = { title, content: text, folder, tags, sync: true };\nreturn [{ json: { requestBody: JSON.stringify(body) } }];"
       }
     },
     {
@@ -676,6 +693,59 @@
         -240,
         900
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the request for the read-only brain_list tool.\n// Optional: pass a subfolder after the command, e.g. \"/show_brain proyectos\".\nconst d = $('Parse intent').first().json;\nconst arg = (d.raw_text || '').trim().replace(/[^A-Za-z0-9_\\/-]/g, '');\nconst body = arg ? { subdir: arg, depth: 3 } : { depth: 3 };\nreturn [{ json: { requestBody: JSON.stringify(body) } }];"
+      },
+      "id": "c1f2a3b4-0001-4a10-9b20-brainbuild001",
+      "name": "Build brain request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8080/tool/brain_list",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "c1f2a3b4-0002-4a10-9b20-brainhttp0002",
+      "name": "Hermes → Show brain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1840,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst tree = r.ok ? r.result : ('⚠️ ' + (r.error || 'No pude leer el brain.'));\nreturn [{ json: { response_text: '🗂️ Estructura del brain:\\n\\n' + tree, source: 'Brain' } }];"
+      },
+      "id": "c1f2a3b4-0003-4a10-9b20-brainparse0003",
+      "name": "Parse brain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        560
+      ]
     }
   ],
   "connections": {
@@ -780,6 +850,13 @@
         [
           {
             "node": "Plan cancel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build brain request",
             "type": "main",
             "index": 0
           }
@@ -1043,6 +1120,39 @@
       ]
     },
     "Plan cancel": {
+      "main": [
+        [
+          {
+            "node": "Merge response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build brain request": {
+      "main": [
+        [
+          {
+            "node": "Hermes → Show brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hermes → Show brain": {
+      "main": [
+        [
+          {
+            "node": "Parse brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse brain": {
       "main": [
         [
           {
