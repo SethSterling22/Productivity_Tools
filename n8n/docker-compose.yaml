@@ -110,6 +110,17 @@ services:
       - HERMES_FS_ALLOW_WRITE_ANYWHERE=${HERMES_FS_ALLOW_WRITE_ANYWHERE:-false}
       - HERMES_FS_ALLOW_DELETE=${HERMES_FS_ALLOW_DELETE:-false}
       - HERMES_CLAUDE_FALLBACK_MODEL=${HERMES_CLAUDE_FALLBACK_MODEL:-qwen3.5:4b}
+      # ── Second brain (git-backed Obsidian vault) ──────────────────────────────
+      # Path to the SSH deploy key used by note_save to push to GitHub. The key
+      # lives INSIDE the hermes_workspace volume (see setup notes), so no host
+      # bind-mount and no uid/permission issues. The gateway sets GIT_SSH_COMMAND
+      # with StrictHostKeyChecking=accept-new, so pushes are fully non-interactive.
+      - HERMES_BRAIN_GIT_SSH_KEY=${HERMES_BRAIN_GIT_SSH_KEY:-/workspace/.ssh/brain_deploy}
+      # Optional overrides (defaults: /workspace/brain, sync on, origin/main):
+      # - HERMES_BRAIN_ROOT=/workspace/brain
+      # - HERMES_BRAIN_GIT_SYNC=true
+      # - HERMES_BRAIN_GIT_REMOTE=origin
+      # - HERMES_BRAIN_GIT_BRANCH=main
     volumes:
       - hermes_workspace:/workspace
       # To let Hermes SSH into cluster nodes: mount a read-only SSH key here,

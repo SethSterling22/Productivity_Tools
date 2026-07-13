@@ -64,7 +64,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const fast = $('Fast route').first().json;\nlet intent, confidence, use_claude, route;\n\nif (fast._decided) {\n  route = fast.route; intent = fast.intent; confidence = fast.confidence; use_claude = fast.use_claude;\n} else {\n  let parsed;\n  try {\n    let raw = $input.first().json.result || '{}';\n    raw = raw.replace(/<think>[\\s\\S]*?<\\/think>/g, '');   // qwen3 reasoning block\n    const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n    const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n    parsed = JSON.parse(match ? match[0] : cleaned);\n  } catch (e) {\n    parsed = { intent: 'CHAT', confidence: 0.5, use_claude: false };\n  }\n  intent = parsed.intent || 'CHAT';\n  confidence = parsed.confidence ?? 0.5;\n  use_claude = !!parsed.use_claude;\n  // Casual conversation must always stay on local Qwen.\n  if (intent === 'CHAT' || intent === 'SIMPLE_QUERY') use_claude = false;\n  const KNOWN = ['TASK','NOTE','CONTENT','PROGRESS','CHAT','SIMPLE_QUERY'];\n  route = use_claude ? 'CLAUDE' : intent;\n  if (route !== 'CLAUDE' && !KNOWN.includes(route)) route = 'CHAT';\n}\n\nreturn [{ json: {\n  raw_text: fast.raw_text,\n  chat_id: fast.chat_id,\n  username: fast.username,\n  timestamp: fast.timestamp,\n  intent, confidence, use_claude, route\n} }];"
+        "jsCode": "const fast = $('Fast route').first().json;\nlet intent, confidence, use_claude, route;\n\nif (fast._decided) {\n  route = fast.route; intent = fast.intent; confidence = fast.confidence; use_claude = fast.use_claude;\n} else {\n  let parsed;\n  try {\n    let raw = $input.first().json.result || '{}';\n    raw = raw.replace(/<think>[\\s\\S]*?<\\/think>/g, '');   // qwen3 reasoning block\n    const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n    const match = cleaned.match(/\\{[\\s\\S]*\\}/);\n    parsed = JSON.parse(match ? match[0] : cleaned);\n  } catch (e) {\n    parsed = { intent: 'CHAT', confidence: 0.5, use_claude: false };\n  }\n  intent = parsed.intent || 'CHAT';\n  confidence = parsed.confidence ?? 0.5;\n  use_claude = !!parsed.use_claude;\n  // Casual conversation must always stay on local Qwen.\n  if (intent === 'CHAT' || intent === 'SIMPLE_QUERY') use_claude = false;\n  const KNOWN = ['TASK','NOTE','CONTENT','PROGRESS','CHAT','SIMPLE_QUERY'];\n  route = use_claude ? 'CLAUDE' : intent;\n  if (route !== 'CLAUDE' && !KNOWN.includes(route)) route = 'CHAT';\n}\n\nreturn [{ json: {\n  raw_text: fast.raw_text,\n  chat_id: fast.chat_id,\n  username: fast.username,\n  timestamp: fast.timestamp,\n  intent, confidence, use_claude, route,\n  tasks: fast.tasks || null\n} }];"
       },
       "id": "parse-intent",
       "name": "Parse intent",
@@ -197,6 +197,57 @@
               },
               "renameOutput": true,
               "outputKey": "simple"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "PLAN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "plan"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "PLAN_CONFIRM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "plan_confirm"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "PLAN_CANCEL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "plan_cancel"
             }
           ]
         },
@@ -351,7 +402,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nlet text = (d.raw_text || '').trim();\nconst lower = text.toLowerCase();\n\n// Slash commands go straight to an agent (skip the qwen classifier).\nconst SLASH = { '/claude':'CLAUDE', '/task':'TASK', '/note':'NOTE', '/content':'CONTENT', '/progress':'PROGRESS', '/qwen':'CHAT', '/chat':'CHAT' };\nlet decided = false, route = null;\nconst m = lower.match(/^(\\/[a-z]+)\\b/);\nif (m && SLASH[m[1]]) {\n  route = SLASH[m[1]];\n  decided = true;\n  text = text.slice(m[1].length).trim();   // strip the command token\n}\n\n// Very large prompts go straight to Claude (skip classification).\nconst MAX_LOCAL_CHARS = 1500;\nif (!decided && text.length > MAX_LOCAL_CHARS) { route = 'CLAUDE'; decided = true; }\n\nconst intent = route === 'CLAUDE' ? 'TECHNICAL_QUERY' : (route || 'CHAT');\nreturn [{\n  json: {\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: decided,\n    route: decided ? route : null,\n    intent: decided ? intent : null,\n    confidence: decided ? 1 : null,\n    use_claude: decided ? (route === 'CLAUDE') : false\n  }\n}];"
+        "jsCode": "const d = $input.first().json;\nlet text = (d.raw_text || '').trim();\nconst lower = text.toLowerCase();\nconst chatKey = String(d.chat_id);\n\n// ── Pending /plan confirmation state (persisted in workflow static data) ──────\nconst staticData = $getWorkflowStaticData('global');\nstaticData.pendingPlans = staticData.pendingPlans || {};\nconst pending = staticData.pendingPlans[chatKey];\n\nfunction emit(route, intent, extra) {\n  return [{ json: Object.assign({\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: true,\n    route: route,\n    intent: intent,\n    confidence: 1,\n    use_claude: route === 'CLAUDE'\n  }, extra || {}) }];\n}\n\nif (pending && Array.isArray(pending.tasks) && pending.tasks.length) {\n  const confirmRe = /^(ok(ey|ay)?|oka|s[ií]|vale|listo|dale|yes|yep|confirm(ar)?|crear|create|hazlo|adelante)(?=$|[\\s,.!;:])/i;\n  const cancelRe  = /^(no|cancel(ar|a)?|descartar?|olv[ií]dalo|nada)(?=$|[\\s,.!;:])/i;\n  const nums = (text.match(/\\d+/g) || []).map(function (n) { return parseInt(n, 10); });\n  const onlyNums = /^[\\s\\d,.]+$/.test(text) && nums.length > 0;\n\n  if (cancelRe.test(text)) {\n    return emit('PLAN_CANCEL', 'PLAN_CANCEL');\n  }\n  if (confirmRe.test(text) || onlyNums) {\n    let tasks = pending.tasks;\n    if (nums.length) tasks = nums.map(function (i) { return pending.tasks[i - 1]; }).filter(Boolean);\n    if (!tasks.length) tasks = pending.tasks;\n    return emit('PLAN_CONFIRM', 'PLAN_CONFIRM', { tasks: tasks });\n  }\n  // Any other message abandons the pending plan and is routed normally.\n  delete staticData.pendingPlans[chatKey];\n}\n\n// ── Slash commands go straight to an agent (skip the qwen classifier) ─────────\nconst SLASH = { '/claude':'CLAUDE', '/task':'TASK', '/note':'NOTE', '/content':'CONTENT', '/progress':'PROGRESS', '/qwen':'CHAT', '/chat':'CHAT', '/plan':'PLAN' };\nlet decided = false, route = null;\nconst m = lower.match(/^(\\/[a-z]+)\\b/);\nif (m && SLASH[m[1]]) {\n  route = SLASH[m[1]];\n  decided = true;\n  text = text.slice(m[1].length).trim();   // strip the command token\n}\n\n// Very large prompts go straight to Claude (skip classification).\nconst MAX_LOCAL_CHARS = 1500;\nif (!decided && text.length > MAX_LOCAL_CHARS) { route = 'CLAUDE'; decided = true; }\n\nconst intent = route === 'CLAUDE' ? 'TECHNICAL_QUERY' : (route || 'CHAT');\nreturn [{\n  json: {\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: decided,\n    route: decided ? route : null,\n    intent: decided ? intent : null,\n    confidence: decided ? 1 : null,\n    use_claude: decided ? (route === 'CLAUDE') : false\n  }\n}];"
       },
       "id": "fast-route",
       "name": "Fast route",
@@ -507,6 +558,124 @@
       "parameters": {
         "jsCode": "const r = $input.first().json;\nconst res = r && r.data && r.data.issueCreate;\nconst issue = res && res.issue;\nconst text = (res && res.success && issue)\n  ? `✅ Task created in Linear: ${issue.identifier} — ${issue.title}\\n${issue.url}`\n  : `⚠️ Could not create the Linear task.\\n${JSON.stringify((r && r.errors) || r).slice(0, 400)}`;\nreturn [{ json: { response_text: text, source: 'Linear' } }];"
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ask the LLM to extract a JSON array of tasks from the plan text.\nconst d = $('Parse intent').first().json;\nconst text = (d.raw_text || '').trim();\nconst system = [\n  'You are a task-extraction assistant.',\n  'From the user message, extract the concrete, actionable tasks it implies.',\n  'Return ONLY a JSON array, with no markdown fences and no prose.',\n  'Each element must be an object: {\"title\": string (imperative, max 120 chars), \"description\": string (optional context, may be empty)}.',\n  'Split compound sentences into separate tasks. Ignore greetings and filler.',\n  'Keep each task in the same language as the user. If there are no actionable tasks, return [].'\n].join(' ');\nconst body = { system: system, prompt: text, max_tokens: 1024, temperature: 0.2 };\nreturn [{ json: { requestBody: JSON.stringify(body) } }];"
+      },
+      "id": "ac36e7b4-521f-4e44-ab68-adb006bf7035",
+      "name": "Build plan prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8080/tool/claude_chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "453a85fd-3f61-4081-81b5-69dc9e5a686a",
+      "name": "Hermes → Extract tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -40,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the extracted tasks, stash them as a pending plan, and show a preview.\nconst d = $('Parse intent').first().json;\nconst chatKey = String(d.chat_id);\nlet raw = $input.first().json.result || '';\nraw = raw.replace(/<think>[\\s\\S]*?<\\/think>/g, '');\nraw = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n\nlet tasks = [];\ntry {\n  const match = raw.match(/\\[[\\s\\S]*\\]/);\n  const arr = JSON.parse(match ? match[0] : raw);\n  if (Array.isArray(arr)) {\n    tasks = arr\n      .map(function (t) { return typeof t === 'string' ? { title: t, description: '' } : t; })\n      .filter(function (t) { return t && t.title; })\n      .map(function (t) { return { title: String(t.title).slice(0, 200), description: String(t.description || '') }; });\n  }\n} catch (e) { tasks = []; }\n\nif (!tasks.length) {\n  return [{ json: {\n    response_text: '🧐 No pude extraer tareas claras de ese texto. Intenta describir con un poco más de detalle lo que hay que hacer.',\n    source: 'Plan'\n  } }];\n}\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.pendingPlans = staticData.pendingPlans || {};\nstaticData.pendingPlans[chatKey] = { tasks: tasks, createdAt: new Date().toISOString() };\n\nconst list = tasks.map(function (t, i) {\n  return (i + 1) + '. ' + t.title + (t.description ? ' — ' + t.description : '');\n}).join('\\n');\nconst response_text = '📋 Detecté ' + tasks.length + ' tarea(s):\\n\\n' + list +\n  '\\n\\nResponde *OK* para crearlas en Linear, *cancelar* para descartar, o los números (ej. `1,3`) para crear solo esas.';\nreturn [{ json: { response_text: response_text, source: 'Plan' } }];"
+      },
+      "id": "b77184f2-ffec-47f7-b876-55c91ab8ff22",
+      "name": "Parse plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One Linear issue per confirmed task (emits one item per task).\nconst d = $('Parse intent').first().json;\nconst tasks = Array.isArray(d.tasks) ? d.tasks : [];\n// TODO: must match the team UUID set in the \"Build task\" node.\nconst LINEAR_TEAM_ID = 'REPLACE_WITH_LINEAR_TEAM_UUID';\nconst query = 'mutation CreateIssue($teamId: String!, $title: String!, $description: String) { issueCreate(input: { teamId: $teamId, title: $title, description: $description }) { success issue { identifier title url } } }';\nif (!tasks.length) {\n  return [{ json: { _empty: true, requestBody: null } }];\n}\nreturn tasks.map(function (t) {\n  return { json: {\n    title: t.title,\n    requestBody: JSON.stringify({\n      query: query,\n      variables: { teamId: LINEAR_TEAM_ID, title: String(t.title).slice(0, 200), description: String(t.description || '') }\n    })\n  } };\n});"
+      },
+      "id": "182a2020-acb1-40a2-aede-7b4b8bb17911",
+      "name": "Build plan issues",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "b41db5a8-955a-437e-8135-65acf0d266a1",
+      "name": "Linear — Create issues (plan)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -40,
+        720
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9DsrffbpiAKa8uGY",
+          "name": "Header Auth - Linear"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate the per-issue responses into one Telegram message; clear state.\nconst items = $input.all();\nconst d = $('Parse intent').first().json;\nconst chatKey = String(d.chat_id);\nconst lines = [];\nlet ok = 0;\nfor (const it of items) {\n  const r = it.json || {};\n  const res = r.data && r.data.issueCreate;\n  const issue = res && res.issue;\n  if (res && res.success && issue) {\n    ok++;\n    lines.push('✅ ' + issue.identifier + ' — ' + issue.title + '\\n' + issue.url);\n  } else {\n    const err = JSON.stringify(r.errors || r).slice(0, 200);\n    lines.push('⚠️ Falló una tarea: ' + err);\n  }\n}\nconst staticData = $getWorkflowStaticData('global');\nif (staticData.pendingPlans) delete staticData.pendingPlans[chatKey];\nconst response_text = '📌 Creé ' + ok + '/' + items.length + ' tarea(s) en Linear:\\n\\n' + lines.join('\\n\\n');\nreturn [{ json: { response_text: response_text, source: 'Linear' } }];"
+      },
+      "id": "25bd4924-bdfc-4133-8dd0-13e83592bc80",
+      "name": "Parse plan result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Parse intent').first().json;\nconst chatKey = String(d.chat_id);\nconst staticData = $getWorkflowStaticData('global');\nif (staticData.pendingPlans) delete staticData.pendingPlans[chatKey];\nreturn [{ json: { response_text: '🚫 Plan descartado. No creé ninguna tarea.', source: 'Plan' } }];"
+      },
+      "id": "3fbfc891-e460-4f29-ae1e-727f585d06f4",
+      "name": "Plan cancel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        900
+      ]
     }
   ],
   "connections": {
@@ -590,6 +759,27 @@
         [
           {
             "node": "Hermes → Ollama (chat/simple)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build plan prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build plan issues",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plan cancel",
             "type": "main",
             "index": 0
           }
@@ -776,6 +966,83 @@
       ]
     },
     "Parse note": {
+      "main": [
+        [
+          {
+            "node": "Merge response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build plan prompt": {
+      "main": [
+        [
+          {
+            "node": "Hermes → Extract tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hermes → Extract tasks": {
+      "main": [
+        [
+          {
+            "node": "Parse plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse plan": {
+      "main": [
+        [
+          {
+            "node": "Merge response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build plan issues": {
+      "main": [
+        [
+          {
+            "node": "Linear — Create issues (plan)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Linear — Create issues (plan)": {
+      "main": [
+        [
+          {
+            "node": "Parse plan result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse plan result": {
+      "main": [
+        [
+          {
+            "node": "Merge response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan cancel": {
       "main": [
         [
           {
