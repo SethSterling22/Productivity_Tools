@@ -385,7 +385,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const all = $input.all();\nconst r = all.find(i => i.json.response_text) || all[0];\nconst d = $('Parse intent').first().json;\nconst src = r.json.source || 'System';\nconst icon = src === 'Claude' ? '🤖' : src.includes('Ollama') ? '⚡' : '🔧';\nreturn [{\n  json: {\n    chat_id: d.chat_id,\n    response_text: r.json.response_text,\n    footer: `\\n\\n${icon} ${src} · ${d.intent} (${Math.round((d.confidence||0)*100)}%)`\n  }\n}];"
+        "jsCode": "const all = $input.all();\nconst r = all.find(i => i.json.response_text) || all[0];\nconst d = $('Parse intent').first().json;\nconst src = r.json.source || 'System';\nconst icon = src === 'Claude' ? '🤖' : src.includes('Ollama') ? '⚡' : '🔧';\nconst intent = String(d.intent || '').replace(/_/g, ' ');\n\n// Build the final message and strip characters that Telegram's Markdown\n// parser treats as entity delimiters (unbalanced _ * ` [ ] break the send).\nlet out = (r.json.response_text || '') +\n  `\\n\\n${icon} ${src} · ${intent} (${Math.round((d.confidence || 0) * 100)}%)`;\nout = out.replace(/[_*`\\[\\]]/g, '');\n\nreturn [{\n  json: {\n    chat_id: d.chat_id,\n    response_text: out,\n    footer: ''\n  }\n}];"
       },
       "id": "merge",
       "name": "Merge response",
