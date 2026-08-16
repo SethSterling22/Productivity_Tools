@@ -71,8 +71,8 @@ services:
       - DB_POSTGRESDB_USER=n8n_admin
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - WEBHOOK_URL=https://ocra.stegosaurus-panga.ts.net/
-      - N8N_EDITOR_BASE_URL=https://ocra.stegosaurus-panga.ts.net/
+      - WEBHOOK_URL=https://ocra-n8n.stegosaurus-panga.ts.net/
+      - N8N_EDITOR_BASE_URL=https://ocra-n8n.stegosaurus-panga.ts.net/
       # Hermes gateway — reachable on localhost because they share the tailscale network
       - HERMES_URL=http://localhost:8080
     volumes:
