@@ -273,14 +273,24 @@ const TOOLS = {
 
   // Read-only view of the second brain: a folder/file tree of the vault.
   // Lists directories and .md notes (skips .git). Never writes anything.
+  // If HERMES_BRAIN_WEB_URL is set (e.g. https://github.com/user/Brain), each
+  // note is shown with its GitHub blob URL so it is clickable from Telegram.
   brain_list: async ({ subdir, depth } = {}) => {
     const cleanSub = (subdir || "").replace(/[^A-Za-z0-9/_-]/g, "");
     const root     = cleanSub ? path.join(BRAIN_ROOT, cleanSub) : BRAIN_ROOT;
     const maxDepth = Math.min(parseInt(depth, 10) || 3, 6);
+    const webBase  = (process.env.HERMES_BRAIN_WEB_URL || "").replace(/\/+$/, "");
+    const branch   = BRAIN_GIT_BRANCH;
     const lines    = [];
     let dirs = 0, files = 0;
 
-    async function walk(dir, prefix, d) {
+    // Build a GitHub blob URL from a repo-relative path (each segment encoded).
+    const blobUrl = (rel) =>
+      webBase
+        ? ` — ${webBase}/blob/${branch}/${rel.split("/").map(encodeURIComponent).join("/")}`
+        : "";
+
+    async function walk(dir, rel, prefix, d) {
       if (d > maxDepth) return;
       let entries;
       try { entries = await fs.readdir(dir, { withFileTypes: true }); }
@@ -289,18 +299,19 @@ const TOOLS = {
         .filter(e => e.name !== ".git")
         .sort((a, b) => (Number(b.isDirectory()) - Number(a.isDirectory())) || a.name.localeCompare(b.name));
       for (const e of entries) {
+        const childRel = rel ? `${rel}/${e.name}` : e.name;
         if (e.isDirectory()) {
           dirs++;
           lines.push(`${prefix}📁 ${e.name}/`);
-          await walk(path.join(dir, e.name), prefix + "   ", d + 1);
+          await walk(path.join(dir, e.name), childRel, prefix + "   ", d + 1);
         } else if (e.name.endsWith(".md")) {
           files++;
-          lines.push(`${prefix}📄 ${e.name}`);
+          lines.push(`${prefix}📄 ${e.name}${blobUrl(childRel)}`);
         }
       }
     }
 
-    await walk(root, "", 1);
+    await walk(root, cleanSub, "", 1);
     const header = `${cleanSub || "brain"}/  (${dirs} carpeta(s), ${files} nota(s))`;
     return lines.length ? `${header}\n${lines.join("\n")}` : `${header}\n(vacío)`;
   },
