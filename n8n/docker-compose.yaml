@@ -116,6 +116,10 @@ services:
       # bind-mount and no uid/permission issues. The gateway sets GIT_SSH_COMMAND
       # with StrictHostKeyChecking=accept-new, so pushes are fully non-interactive.
       - HERMES_BRAIN_GIT_SSH_KEY=${HERMES_BRAIN_GIT_SSH_KEY:-/workspace/.ssh/brain_deploy}
+      # Public web base for the brain repo. When set, /show_brain returns a
+      # clickable GitHub URL per note (blob/<branch>/<path>). Leave empty to
+      # show a plain tree with no links.
+      - HERMES_BRAIN_WEB_URL=${HERMES_BRAIN_WEB_URL:-https://github.com/SethSterling22/Brain}
       # Optional overrides (defaults: /workspace/brain, sync on, origin/main):
       # - HERMES_BRAIN_ROOT=/workspace/brain
       # - HERMES_BRAIN_GIT_SYNC=true
