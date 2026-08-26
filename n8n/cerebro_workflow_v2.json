@@ -265,6 +265,40 @@
               },
               "renameOutput": true,
               "outputKey": "brain"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "CALENDAR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "calendar"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "SCHEDULE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "schedule"
             }
           ]
         },
@@ -419,7 +453,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nlet text = (d.raw_text || '').trim();\nconst lower = text.toLowerCase();\nconst chatKey = String(d.chat_id);\n\n// ── Pending /plan confirmation state (persisted in workflow static data) ──────\nconst staticData = $getWorkflowStaticData('global');\nstaticData.pendingPlans = staticData.pendingPlans || {};\nconst pending = staticData.pendingPlans[chatKey];\n\nfunction emit(route, intent, extra) {\n  return [{ json: Object.assign({\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: true,\n    route: route,\n    intent: intent,\n    confidence: 1,\n    use_claude: route === 'CLAUDE'\n  }, extra || {}) }];\n}\n\nif (pending && Array.isArray(pending.tasks) && pending.tasks.length) {\n  const confirmRe = /^(ok(ey|ay)?|oka|s[ií]|vale|listo|dale|yes|yep|confirm(ar)?|crear|create|hazlo|adelante)(?=$|[\\s,.!;:])/i;\n  const cancelRe  = /^(no|cancel(ar|a)?|descartar?|olv[ií]dalo|nada)(?=$|[\\s,.!;:])/i;\n  const nums = (text.match(/\\d+/g) || []).map(function (n) { return parseInt(n, 10); });\n  const onlyNums = /^[\\s\\d,.]+$/.test(text) && nums.length > 0;\n\n  if (cancelRe.test(text)) {\n    return emit('PLAN_CANCEL', 'PLAN_CANCEL');\n  }\n  if (confirmRe.test(text) || onlyNums) {\n    let tasks = pending.tasks;\n    if (nums.length) tasks = nums.map(function (i) { return pending.tasks[i - 1]; }).filter(Boolean);\n    if (!tasks.length) tasks = pending.tasks;\n    return emit('PLAN_CONFIRM', 'PLAN_CONFIRM', { tasks: tasks });\n  }\n  // Any other message abandons the pending plan and is routed normally.\n  delete staticData.pendingPlans[chatKey];\n}\n\n// ── Slash commands go straight to an agent (skip the qwen classifier) ─────────\nconst SLASH = { '/claude':'CLAUDE', '/task':'TASK', '/note':'NOTE', '/content':'CONTENT', '/progress':'PROGRESS', '/qwen':'CHAT', '/chat':'CHAT', '/plan':'PLAN', '/show_brain':'BRAIN', '/brain':'BRAIN' };\nlet decided = false, route = null;\nconst m = lower.match(/^(\\/[a-z_]+)(?=$|\\s)/);\nif (m && SLASH[m[1]]) {\n  route = SLASH[m[1]];\n  decided = true;\n  text = text.slice(m[1].length).trim();   // strip the command token\n}\n\n// Very large prompts go straight to Claude (skip classification).\nconst MAX_LOCAL_CHARS = 1500;\nif (!decided && text.length > MAX_LOCAL_CHARS) { route = 'CLAUDE'; decided = true; }\n\nconst intent = route === 'CLAUDE' ? 'TECHNICAL_QUERY' : (route || 'CHAT');\nreturn [{\n  json: {\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: decided,\n    route: decided ? route : null,\n    intent: decided ? intent : null,\n    confidence: decided ? 1 : null,\n    use_claude: decided ? (route === 'CLAUDE') : false\n  }\n}];"
+        "jsCode": "const d = $input.first().json;\nlet text = (d.raw_text || '').trim();\nconst lower = text.toLowerCase();\nconst chatKey = String(d.chat_id);\n\n// ── Pending /plan confirmation state (persisted in workflow static data) ──────\nconst staticData = $getWorkflowStaticData('global');\nstaticData.pendingPlans = staticData.pendingPlans || {};\nconst pending = staticData.pendingPlans[chatKey];\n\nfunction emit(route, intent, extra) {\n  return [{ json: Object.assign({\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: true,\n    route: route,\n    intent: intent,\n    confidence: 1,\n    use_claude: route === 'CLAUDE'\n  }, extra || {}) }];\n}\n\nif (pending && Array.isArray(pending.tasks) && pending.tasks.length) {\n  const confirmRe = /^(ok(ey|ay)?|oka|s[ií]|vale|listo|dale|yes|yep|confirm(ar)?|crear|create|hazlo|adelante)(?=$|[\\s,.!;:])/i;\n  const cancelRe  = /^(no|cancel(ar|a)?|descartar?|olv[ií]dalo|nada)(?=$|[\\s,.!;:])/i;\n  const nums = (text.match(/\\d+/g) || []).map(function (n) { return parseInt(n, 10); });\n  const onlyNums = /^[\\s\\d,.]+$/.test(text) && nums.length > 0;\n\n  if (cancelRe.test(text)) {\n    return emit('PLAN_CANCEL', 'PLAN_CANCEL');\n  }\n  if (confirmRe.test(text) || onlyNums) {\n    let tasks = pending.tasks;\n    if (nums.length) tasks = nums.map(function (i) { return pending.tasks[i - 1]; }).filter(Boolean);\n    if (!tasks.length) tasks = pending.tasks;\n    return emit('PLAN_CONFIRM', 'PLAN_CONFIRM', { tasks: tasks });\n  }\n  // Any other message abandons the pending plan and is routed normally.\n  delete staticData.pendingPlans[chatKey];\n}\n\n// ── Slash commands go straight to an agent (skip the qwen classifier) ─────────\nconst SLASH = { '/claude':'CLAUDE', '/task':'TASK', '/note':'NOTE', '/content':'CONTENT', '/progress':'PROGRESS', '/qwen':'CHAT', '/chat':'CHAT', '/plan':'PLAN', '/show_brain':'BRAIN', '/brain':'BRAIN', '/calendar':'CALENDAR', '/schedule':'SCHEDULE' };\nlet decided = false, route = null;\nconst m = lower.match(/^(\\/[a-z_]+)(?=$|\\s)/);\nif (m && SLASH[m[1]]) {\n  route = SLASH[m[1]];\n  decided = true;\n  text = text.slice(m[1].length).trim();   // strip the command token\n}\n\n// Very large prompts go straight to Claude (skip classification).\nconst MAX_LOCAL_CHARS = 1500;\nif (!decided && text.length > MAX_LOCAL_CHARS) { route = 'CLAUDE'; decided = true; }\n\nconst intent = route === 'CLAUDE' ? 'TECHNICAL_QUERY' : (route || 'CHAT');\nreturn [{\n  json: {\n    raw_text: text,\n    chat_id: d.chat_id,\n    username: d.username,\n    timestamp: d.timestamp,\n    _decided: decided,\n    route: decided ? route : null,\n    intent: decided ? intent : null,\n    confidence: decided ? 1 : null,\n    use_claude: decided ? (route === 'CLAUDE') : false\n  }\n}];"
       },
       "id": "fast-route",
       "name": "Fast route",
@@ -746,6 +780,172 @@
         2040,
         560
       ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "primary"
+        },
+        "returnAll": false,
+        "limit": 50,
+        "options": {
+          "timeMin": "={{ $now.setZone('America/Puerto_Rico').startOf('day').toISO() }}",
+          "timeMax": "={{ $now.setZone('America/Puerto_Rico').endOf('day').toISO() }}",
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      },
+      "id": "d2e3f4a5-0001-4b10-9c20-caltoday000001",
+      "name": "Calendar today",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1640,
+        760
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "YOUR_GOOGLE_CAL_CRED",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format today's Google Calendar events into a Telegram message.\nconst tz = 'America/Puerto_Rico';\nconst events = $input.all().map(i => i.json).filter(e => e && (e.id || e.summary));\nif (!events.length) {\n  return [{ json: { response_text: '📅 No tienes eventos para hoy.', source: 'Calendar' } }];\n}\nconst lines = events.map(function (e) {\n  let t;\n  if (e.start && e.start.dateTime) {\n    try { t = new Date(e.start.dateTime).toLocaleTimeString('es-PR', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); }\n    catch (x) { t = ''; }\n  } else {\n    t = 'Todo el día';\n  }\n  return '• ' + t + ' — ' + (e.summary || '(sin título)');\n});\nconst today = new Date().toLocaleDateString('es-PR', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long' });\nreturn [{ json: { response_text: '📅 Agenda de hoy (' + today + '):\\n\\n' + lines.join('\\n'), source: 'Calendar' } }];"
+      },
+      "id": "d2e3f4a5-0002-4b10-9c20-calparse000002",
+      "name": "Parse calendar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ask the LLM to extract one calendar event from the message.\nconst d = $('Parse intent').first().json;\nconst text = (d.raw_text || '').trim();\nconst tz = 'America/Puerto_Rico';\nconst now = new Date();\nconst todayStr = now.toLocaleDateString('en-CA', { timeZone: tz });\nconst nowTime = now.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' });\nconst system = [\n  'You extract a SINGLE calendar event from the user message.',\n  'The user timezone is ' + tz + ' (UTC-04:00, no DST). Today is ' + todayStr + ' and the current local time is ' + nowTime + '.',\n  'Resolve relative dates like \"mañana\", \"el viernes\", \"en 2 horas\" against that.',\n  'Return ONLY a JSON object, no markdown, no prose, with keys:',\n  '{\"title\": string, \"start\": ISO8601 with -04:00 offset, \"end\": ISO8601 with -04:00 offset, \"description\": string}.',\n  'If no end time is implied, set end to one hour after start. If no time is given, use 09:00 local time.',\n  'Keep the title in the same language as the user.'\n].join(' ');\nconst body = { system: system, prompt: text, max_tokens: 512, temperature: 0.1 };\nreturn [{ json: { requestBody: JSON.stringify(body) } }];"
+      },
+      "id": "d2e3f4a5-0003-4b10-9c20-schedprompt003",
+      "name": "Build schedule prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8080/tool/claude_chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "d2e3f4a5-0004-4b10-9c20-schedextract04",
+      "name": "Hermes → Extract event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1840,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the event JSON produced by the LLM.\nlet raw = $input.first().json.result || '';\nraw = raw.replace(/<think>[\\s\\S]*?<\\/think>/g, '');\nraw = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\nlet ev = null;\ntry { const m = raw.match(/\\{[\\s\\S]*\\}/); ev = JSON.parse(m ? m[0] : raw); } catch (e) { ev = null; }\nif (!ev || !ev.title || !ev.start) {\n  return [{ json: { _error: true, response_text: '🧐 No pude entender la fecha/hora del evento. Prueba algo como \"/schedule reunión con Ana mañana 3pm\".', source: 'Calendar' } }];\n}\nif (!ev.end) {\n  const s = new Date(ev.start);\n  ev.end = new Date(s.getTime() + 3600000).toISOString();\n}\nreturn [{ json: { _error: false, title: String(ev.title).slice(0, 200), start: ev.start, end: ev.end, description: String(ev.description || '') } }];"
+      },
+      "id": "d2e3f4a5-0005-4b10-9c20-schedparse0005",
+      "name": "Parse event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "event-ok-cond",
+              "leftValue": "={{ $json._error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d2e3f4a5-0006-4b10-9c20-schedif00000006",
+      "name": "Event OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2240,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "primary"
+        },
+        "start": "={{ $json.start }}",
+        "end": "={{ $json.end }}",
+        "additionalFields": {
+          "summary": "={{ $json.title }}",
+          "description": "={{ $json.description }}"
+        }
+      },
+      "id": "d2e3f4a5-0007-4b10-9c20-calcreate00007",
+      "name": "Calendar create",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2440,
+        880
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "YOUR_GOOGLE_CAL_CRED",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Confirm the created event back to the user.\nconst r = $input.first().json;\nconst tz = 'America/Puerto_Rico';\nconst link = r.htmlLink || '';\nconst summary = r.summary || 'Evento';\nconst startRaw = (r.start && (r.start.dateTime || r.start.date)) || '';\nlet when = startRaw;\ntry { when = new Date(startRaw).toLocaleString('es-PR', { timeZone: tz, dateStyle: 'medium', timeStyle: 'short' }); } catch (e) {}\nconst text = r.id\n  ? '📅 Evento creado: ' + summary + '\\n🕒 ' + when + (link ? '\\n' + link : '')\n  : '⚠️ No pude crear el evento.\\n' + JSON.stringify(r).slice(0, 300);\nreturn [{ json: { response_text: text, source: 'Calendar' } }];"
+      },
+      "id": "d2e3f4a5-0008-4b10-9c20-schedresult008",
+      "name": "Parse schedule result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        880
+      ]
     }
   ],
   "connections": {
@@ -857,6 +1057,20 @@
         [
           {
             "node": "Build brain request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calendar today",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build schedule prompt",
             "type": "main",
             "index": 0
           }
@@ -1153,6 +1367,101 @@
       ]
     },
     "Parse brain": {
+      "main": [
+        [
+          {
+            "node": "Merge response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar today": {
+      "main": [
+        [
+          {
+            "node": "Parse calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse calendar": {
+      "main": [
+        [
+          {
+            "node": "Merge response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build schedule prompt": {
+      "main": [
+        [
+          {
+            "node": "Hermes → Extract event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hermes → Extract event": {
+      "main": [
+        [
+          {
+            "node": "Parse event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse event": {
+      "main": [
+        [
+          {
+            "node": "Event OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event OK?": {
+      "main": [
+        [
+          {
+            "node": "Calendar create",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar create": {
+      "main": [
+        [
+          {
+            "node": "Parse schedule result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse schedule result": {
       "main": [
         [
           {
