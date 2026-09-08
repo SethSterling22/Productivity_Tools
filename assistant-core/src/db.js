@@ -45,9 +45,22 @@ export function getPool() {
 }
 
 // Run the schema migration on startup. Safe to call repeatedly (IF NOT EXISTS).
-export async function migrate() {
+// Retries on transient failures (e.g. EAI_AGAIN while the shared Tailscale netns
+// DNS warms up and can forward the Docker "postgres" name).
+export async function migrate({ attempts = 10, delayMs = 2000 } = {}) {
   if (!hasDb()) return;
-  await getPool().query(SCHEMA_SQL);
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await getPool().query(SCHEMA_SQL);
+      return;
+    } catch (err) {
+      lastErr = err;
+      console.error(`[db] migration attempt ${i}/${attempts} failed: ${err.message}`);
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
 }
 
 export async function ensureSession(id, channel, title) {
