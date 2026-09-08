@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "create_task",
+      "description": "Create a task/issue in Linear. Use when the user wants to remember a to-do or action item.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "description": "Short imperative title." },
+          "description": { "type": "string", "description": "Optional details/context." }
+        },
+        "required": ["title"]
+      },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/create_task" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "check-square"
+    },
+    {
+      "name": "create_event",
+      "description": "Create a Google Calendar event. Provide ISO 8601 start/end with the -04:00 (America/Puerto_Rico) offset.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "start": { "type": "string", "description": "ISO 8601 start, e.g. 2026-08-18T15:00:00-04:00" },
+          "end": { "type": "string", "description": "ISO 8601 end. If omitted, defaults to 1h after start." },
+          "description": { "type": "string" }
+        },
+        "required": ["title", "start"]
+      },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/create_event" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "calendar-plus"
+    },
+    {
+      "name": "list_today_events",
+      "description": "List the user's Google Calendar events for today.",
+      "input_schema": { "type": "object", "properties": {} },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/list_today_events" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "calendar"
+    },
+    {
+      "name": "save_note",
+      "description": "Save a note to the second brain (git-backed vault). Use @folder to route and #tags to label.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "folder": { "type": "string", "description": "Target folder, defaults to Inbox." },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["content"]
+      },
+      "endpoint": { "type": "hermes_tool", "path": "/tool/note_save" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "file-plus"
+    },
+    {
+      "name": "search_brain",
+      "description": "Browse the second brain: return the folder/note tree, optionally within a subfolder.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "subdir": { "type": "string", "description": "Optional subfolder to list." },
+          "depth": { "type": "integer", "description": "Tree depth (default 3)." }
+        }
+      },
+      "endpoint": { "type": "hermes_tool", "path": "/tool/brain_list" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "folder-tree"
+    }
+  ]
+}

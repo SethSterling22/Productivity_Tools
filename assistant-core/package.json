@@ -1,0 +1,19 @@
+{
+  "name": "assistant-core",
+  "version": "0.1.0",
+  "description": "Conversational brain for the Cerebro personal assistant: LLM tool-calling loop, memory, and a streaming chat API shared by the dashboard and Telegram.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "fastify": "^5.1.0",
+    "pg": "^8.13.1"
+  }
+}
