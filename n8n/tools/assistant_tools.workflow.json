@@ -1,0 +1,168 @@
+{
+  "name": "assistant tools (Rebeca)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tool/create_task",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh-create-task-0001",
+      "name": "Webhook · create_task",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 200],
+      "webhookId": "tool-create-task"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $json.body || $json || {};\nconst title = String(d.title || 'Untitled task').slice(0, 200);\nconst description = String(d.description || '');\n// TODO: set your Linear team UUID (same as the cerebro workflow's Build task).\nconst LINEAR_TEAM_ID = 'REPLACE_WITH_LINEAR_TEAM_UUID';\nconst body = {\n  query: 'mutation CreateIssue($teamId: String!, $title: String!, $description: String) { issueCreate(input: { teamId: $teamId, title: $title, description: $description }) { success issue { identifier title url } } }',\n  variables: { teamId: LINEAR_TEAM_ID, title, description }\n};\nreturn [{ json: { requestBody: JSON.stringify(body) } }];"
+      },
+      "id": "build-create-task-0002",
+      "name": "Build task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "linear-create-task-0003",
+      "name": "Linear — Create issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 200],
+      "credentials": { "httpHeaderAuth": { "id": "9DsrffbpiAKa8uGY", "name": "Header Auth - Linear" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json;\nconst res = r && r.data && r.data.issueCreate;\nconst issue = res && res.issue;\nif (res && res.success && issue) {\n  return [{ json: { ok: true, identifier: issue.identifier, title: issue.title, url: issue.url } }];\n}\nreturn [{ json: { ok: false, error: 'Linear did not create the issue', detail: JSON.stringify((r && r.errors) || r).slice(0, 300) } }];"
+      },
+      "id": "shape-create-task-0004",
+      "name": "Shape task response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tool/create_event",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh-create-event-0001",
+      "name": "Webhook · create_event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 420],
+      "webhookId": "tool-create-event"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $json.body || $json || {};\nconst title = String(d.title || 'Evento').slice(0, 200);\nconst start = String(d.start || '');\nlet end = String(d.end || '');\nif (!end && start) { try { end = new Date(new Date(start).getTime() + 3600000).toISOString(); } catch (e) {} }\nreturn [{ json: { title, start, end, description: String(d.description || '') } }];"
+      },
+      "id": "build-create-event-0002",
+      "name": "Build event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 420]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "calendar": { "__rl": true, "mode": "list", "value": "primary" },
+        "start": "={{ $json.start }}",
+        "end": "={{ $json.end }}",
+        "additionalFields": { "summary": "={{ $json.title }}", "description": "={{ $json.description }}" }
+      },
+      "id": "gcal-create-event-0003",
+      "name": "Calendar create",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [680, 420],
+      "credentials": { "googleCalendarOAuth2Api": { "id": "YOUR_GOOGLE_CAL_CRED", "name": "Google Calendar" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json;\nif (r && r.id) {\n  return [{ json: { ok: true, id: r.id, summary: r.summary || '', htmlLink: r.htmlLink || '', start: r.start } }];\n}\nreturn [{ json: { ok: false, error: 'Calendar did not create the event', detail: JSON.stringify(r).slice(0, 300) } }];"
+      },
+      "id": "shape-create-event-0004",
+      "name": "Shape event response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 420]
+    },
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tool/list_today_events",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh-list-events-0001",
+      "name": "Webhook · list_today_events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 640],
+      "webhookId": "tool-list-today-events"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": { "__rl": true, "mode": "list", "value": "primary" },
+        "returnAll": false,
+        "limit": 50,
+        "options": {
+          "timeMin": "={{ $now.setZone('America/Puerto_Rico').startOf('day').toISO() }}",
+          "timeMax": "={{ $now.setZone('America/Puerto_Rico').endOf('day').toISO() }}",
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      },
+      "id": "gcal-list-events-0002",
+      "name": "Calendar today",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [460, 640],
+      "alwaysOutputData": true,
+      "credentials": { "googleCalendarOAuth2Api": { "id": "YOUR_GOOGLE_CAL_CRED", "name": "Google Calendar" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tz = 'America/Puerto_Rico';\nconst events = $input.all().map(i => i.json).filter(e => e && (e.id || e.summary));\nconst out = events.map(function (e) {\n  const dt = e.start && e.start.dateTime;\n  let time = 'all-day';\n  if (dt) { try { time = new Date(dt).toLocaleTimeString('es-PR', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (x) {} }\n  return { time, title: e.summary || '(sin título)', start: (e.start && (e.start.dateTime || e.start.date)) || null };\n});\nreturn [{ json: { ok: true, count: out.length, events: out } }];"
+      },
+      "id": "shape-list-events-0003",
+      "name": "Shape events response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 640]
+    }
+  ],
+  "connections": {
+    "Webhook · create_task": { "main": [[{ "node": "Build task", "type": "main", "index": 0 }]] },
+    "Build task": { "main": [[{ "node": "Linear — Create issue", "type": "main", "index": 0 }]] },
+    "Linear — Create issue": { "main": [[{ "node": "Shape task response", "type": "main", "index": 0 }]] },
+
+    "Webhook · create_event": { "main": [[{ "node": "Build event", "type": "main", "index": 0 }]] },
+    "Build event": { "main": [[{ "node": "Calendar create", "type": "main", "index": 0 }]] },
+    "Calendar create": { "main": [[{ "node": "Shape event response", "type": "main", "index": 0 }]] },
+
+    "Webhook · list_today_events": { "main": [[{ "node": "Calendar today", "type": "main", "index": 0 }]] },
+    "Calendar today": { "main": [[{ "node": "Shape events response", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
