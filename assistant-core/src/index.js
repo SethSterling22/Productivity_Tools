@@ -8,17 +8,37 @@
 // tailnet-only. Do not expose it via Tailscale Funnel.
 
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import { config } from "./config.js";
 import { migrate, hasDb } from "./db.js";
 import { loadManifest, watchManifest, listTools, dispatch } from "./tools.js";
 import { runAgent } from "./agent.js";
+import { authEnabled, loginUrl, exchangeCode, emailAllowed, secureCookies } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = Fastify({ logger: true });
+
+const SESSION = "rebeca_session";
+const OAUTH_STATE = "rebeca_oauth_state";
+const cookieOpts = () => ({ httpOnly: true, sameSite: "lax", path: "/", signed: true, secure: secureCookies() });
+
+// Gate every route except /health and /auth/* once Google OAuth is configured.
+app.addHook("onRequest", async (req, reply) => {
+  if (!authEnabled()) return;
+  const p = req.url.split("?")[0];
+  if (p === "/health" || p.startsWith("/auth/")) return;
+  const raw = req.cookies?.[SESSION];
+  const un = raw ? req.unsignCookie(raw) : { valid: false };
+  if (un.valid && emailAllowed(un.value)) return;
+  const wantsHtml = (req.headers.accept || "").includes("text/html");
+  if (wantsHtml && req.method === "GET") return reply.redirect("/auth/login");
+  return reply.code(401).send({ ok: false, error: "unauthorized" });
+});
 
 app.get("/health", async () => ({
   ok: true,
@@ -28,6 +48,44 @@ app.get("/health", async () => ({
 }));
 
 app.get("/tools", async () => ({ tools: listTools() }));
+
+// ── Google OAuth routes ────────────────────────────────────────────────────
+app.get("/auth/login", async (req, reply) => {
+  if (!authEnabled()) return reply.redirect("/");
+  const state = crypto.randomBytes(16).toString("hex");
+  reply.setCookie(OAUTH_STATE, state, { ...cookieOpts(), maxAge: 600 });
+  return reply.redirect(loginUrl(state));
+});
+
+app.get("/auth/callback", async (req, reply) => {
+  const { code, state } = req.query || {};
+  const raw = req.cookies?.[OAUTH_STATE];
+  const un = raw ? req.unsignCookie(raw) : { valid: false };
+  if (!code || !un.valid || un.value !== state) {
+    return reply.code(400).send("Invalid OAuth state. Try again from /auth/login.");
+  }
+  let email;
+  try {
+    ({ email } = await exchangeCode(code));
+  } catch (err) {
+    return reply.code(502).send("Google token exchange failed: " + err.message);
+  }
+  if (!emailAllowed(email)) return reply.code(403).send("Cuenta no autorizada: " + email);
+  reply.setCookie(SESSION, email, { ...cookieOpts(), maxAge: 60 * 60 * 24 * 7 });
+  reply.clearCookie(OAUTH_STATE, { path: "/" });
+  return reply.redirect("/");
+});
+
+app.get("/auth/logout", async (req, reply) => {
+  reply.clearCookie(SESSION, { path: "/" });
+  return reply.redirect("/auth/login");
+});
+
+app.get("/auth/me", async (req) => {
+  const raw = req.cookies?.[SESSION];
+  const un = raw ? req.unsignCookie(raw) : { valid: false };
+  return { authEnabled: authEnabled(), email: un.valid ? un.value : null };
+});
 
 // ── Dashboard widget data sources (read-only) ──────────────────────────────
 // Today's calendar events, via the list_today_events tool webhook.
@@ -97,6 +155,7 @@ app.post("/chat/stream", async (req, reply) => {
 });
 
 async function start() {
+  await app.register(cookie, { secret: config.sessionSecret });
   await app.register(cors, { origin: true, credentials: true });
   // Serve the dashboard SPA (tailnet-only; Google OAuth gate arrives in WS-E).
   await app.register(fastifyStatic, {

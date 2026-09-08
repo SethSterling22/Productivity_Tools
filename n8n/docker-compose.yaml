@@ -165,8 +165,12 @@ services:
       # Tool backends (same netns, so localhost).
       - HERMES_URL=http://127.0.0.1:8080
       - N8N_WEBHOOK_BASE=http://127.0.0.1:5678/webhook
-      # Dashboard auth allowlist (used in WS-E; safe to set now).
+      # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).
       - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-}
+      - SESSION_SECRET=${SESSION_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -36,8 +36,13 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL || "",
   memoryWindow: Number(process.env.MEMORY_WINDOW || 20), // turns kept in context
 
-  // ── Auth (Phase 1: Google OAuth is enforced at the edge; allowlist here) ────
+  // ── Auth: Google OAuth (OIDC). Disabled until GOOGLE_CLIENT_ID is set. ──────
   allowedEmails: list(process.env.ALLOWED_GOOGLE_EMAILS),
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
+  // Secret used to sign session cookies. Set it in .env so sessions survive restarts.
+  sessionSecret: process.env.SESSION_SECRET || ("dev-insecure-" + Math.random().toString(36).slice(2)),
 
   // ── Tool manifest ──────────────────────────────────────────────────────────
   manifestPath: process.env.TOOLS_MANIFEST || path.join(__dirname, "..", "tools.manifest.json"),
