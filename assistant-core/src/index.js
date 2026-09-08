@@ -28,17 +28,21 @@ const OAUTH_STATE = "rebeca_oauth_state";
 const cookieOpts = () => ({ httpOnly: true, sameSite: "lax", path: "/", signed: true, secure: secureCookies() });
 
 // Gate every route except /health and /auth/* once Google OAuth is configured.
-app.addHook("onRequest", async (req, reply) => {
-  if (!authEnabled()) return;
-  const p = req.url.split("?")[0];
-  if (p === "/health" || p.startsWith("/auth/")) return;
-  const raw = req.cookies?.[SESSION];
-  const un = raw ? req.unsignCookie(raw) : { valid: false };
-  if (un.valid && emailAllowed(un.value)) return;
-  const wantsHtml = (req.headers.accept || "").includes("text/html");
-  if (wantsHtml && req.method === "GET") return reply.redirect("/auth/login");
-  return reply.code(401).send({ ok: false, error: "unauthorized" });
-});
+// IMPORTANT: this hook must be installed AFTER @fastify/cookie is registered,
+// otherwise req.cookies is not populated when it runs (causes a login loop).
+function installAuthGate() {
+  app.addHook("onRequest", async (req, reply) => {
+    if (!authEnabled()) return;
+    const p = req.url.split("?")[0];
+    if (p === "/health" || p.startsWith("/auth/")) return;
+    const raw = req.cookies?.[SESSION];
+    const un = raw ? req.unsignCookie(raw) : { valid: false };
+    if (un.valid && emailAllowed(un.value)) return;
+    const wantsHtml = (req.headers.accept || "").includes("text/html");
+    if (wantsHtml && req.method === "GET") return reply.redirect("/auth/login");
+    return reply.code(401).send({ ok: false, error: "unauthorized" });
+  });
+}
 
 app.get("/health", async () => ({
   ok: true,
@@ -156,6 +160,7 @@ app.post("/chat/stream", async (req, reply) => {
 
 async function start() {
   await app.register(cookie, { secret: config.sessionSecret });
+  installAuthGate(); // after cookie plugin so req.cookies is populated
   await app.register(cors, { origin: true, credentials: true });
   // Serve the dashboard SPA (tailnet-only; Google OAuth gate arrives in WS-E).
   await app.register(fastifyStatic, {
