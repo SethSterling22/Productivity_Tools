@@ -9,6 +9,7 @@ RUN npm install --omit=dev
 
 COPY src ./src
 COPY migrations ./migrations
+COPY public ./public
 COPY tools.manifest.json ./tools.manifest.json
 
 USER assistant

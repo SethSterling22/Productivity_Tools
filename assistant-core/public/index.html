@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rebeca</title>
+<script src="https://cdn.jsdelivr.net/npm/force-graph@1.43.5/dist/force-graph.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f17; --panel: #121826; --panel2: #0e131f; --border: #1f2937;
+    --text: #e5e7eb; --muted: #8b98ad; --accent: #38bdf8; --accent2: #22d3ee;
+    --user: #1e3a5f; --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: grid; grid-template-columns: 1.4fr 1fr; grid-template-rows: 100vh;
+  }
+  header {
+    grid-column: 1 / -1; display: none;
+  }
+  /* Chat column */
+  .chat { display: flex; flex-direction: column; border-right: 1px solid var(--border); min-height: 0; }
+  .brand {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .brand .logo {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--accent2), var(--accent));
+    box-shadow: 0 0 16px rgba(56,189,248,.5);
+  }
+  .brand h1 { font-size: 16px; margin: 0; letter-spacing: .5px; }
+  .brand .status { margin-left: auto; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.err { background: var(--err); }
+
+  .messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 85%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 4px; }
+  .msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .msg a { color: var(--accent); }
+  .tool { align-self: flex-start; font-size: 12px; color: var(--muted); background: var(--panel2); border: 1px dashed var(--border); padding: 4px 10px; border-radius: 10px; }
+  .tool b { color: var(--accent2); }
+
+  .composer { padding: 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+  .composer textarea {
+    flex: 1; resize: none; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: inherit; max-height: 120px;
+  }
+  .composer button {
+    border: none; border-radius: 10px; padding: 0 16px; font-weight: 600; cursor: pointer;
+    background: var(--accent); color: #04222e;
+  }
+  .composer button:disabled { opacity: .5; cursor: default; }
+  .composer .mic { background: var(--panel2); color: var(--muted); border: 1px solid var(--border); }
+  .composer .mic[title] { cursor: not-allowed; }
+
+  /* Sidebar */
+  .side { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; background: var(--panel2); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .card .body { padding: 12px 14px; }
+  .cal-item { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .cal-item:last-child { border-bottom: none; }
+  .cal-item .t { color: var(--accent2); font-variant-numeric: tabular-nums; min-width: 62px; }
+  .empty { color: var(--muted); font-style: italic; }
+  .caps { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cap { font-size: 12px; background: var(--panel2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; color: var(--text); }
+  #graph { height: 260px; background: var(--panel2); }
+  .hint { font-size: 11px; color: var(--muted); padding: 0 14px 12px; }
+</style>
+</head>
+<body>
+  <section class="chat">
+    <div class="brand">
+      <div class="logo"></div>
+      <h1>Rebeca</h1>
+      <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">conectando…</span></div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="composer">
+      <button class="mic" title="Voz — próximamente (Fase 2)">🎤</button>
+      <textarea id="input" rows="1" placeholder="Escribe a Rebeca…  (Enter para enviar)"></textarea>
+      <button id="send">Enviar</button>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card">
+      <h2>📅 Agenda de hoy</h2>
+      <div class="body" id="calendar"><span class="empty">Cargando…</span></div>
+    </div>
+    <div class="card">
+      <h2>🧠 Second brain</h2>
+      <div id="graph"></div>
+      <div class="hint" id="graphHint"></div>
+    </div>
+    <div class="card">
+      <h2>⚙️ Capacidades</h2>
+      <div class="body"><div class="caps" id="caps"><span class="empty">Cargando…</span></div></div>
+    </div>
+  </aside>
+
+<script>
+const API = ""; // same origin as assistant-core
+const sessionId = "dashboard:" + (localStorage.getItem("rebeca_sid") || (() => {
+  const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem("rebeca_sid", id); return id;
+})());
+
+const $ = (id) => document.getElementById(id);
+const messages = $("messages");
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function linkify(s) { return esc(s).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
+
+function addMsg(role, text) {
+  const el = document.createElement("div");
+  el.className = "msg " + role;
+  el.innerHTML = linkify(text);
+  messages.appendChild(el);
+  messages.scrollTop = messages.scrollHeight;
+  return el;
+}
+function addTool(name, label) {
+  const el = document.createElement("div");
+  el.className = "tool";
+  el.innerHTML = label + " <b>" + esc(name) + "</b>";
+  messages.appendChild(el);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+async function send() {
+  const input = $("input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = ""; input.style.height = "auto";
+  $("send").disabled = true;
+  addMsg("user", text);
+  let asstEl = null;
+  let buffer = "";
+
+  try {
+    const res = await fetch(API + "/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, message: text, channel: "dashboard" }),
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let event = null;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) {
+          const data = JSON.parse(line.slice(5).trim());
+          if (event === "tool_call") addTool(data.name, "🔧 llamando");
+          else if (event === "tool_result") addTool(data.name, "✅ resultado de");
+          else if (event === "text") { if (data.text) { if (!asstEl) asstEl = addMsg("assistant", ""); asstEl.innerHTML = linkify(data.text); messages.scrollTop = messages.scrollHeight; } }
+          else if (event === "error") addMsg("assistant", "⚠️ " + (data.message || "error"));
+        }
+      }
+    }
+  } catch (err) {
+    addMsg("assistant", "⚠️ No pude conectar: " + err.message);
+  } finally {
+    $("send").disabled = false;
+    $("input").focus();
+    loadCalendar(); // a tool may have changed things
+  }
+}
+
+$("send").onclick = send;
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$("input").addEventListener("input", (e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; });
+
+async function loadHealth() {
+  try {
+    const h = await (await fetch(API + "/health")).json();
+    $("healthDot").className = "dot ok";
+    $("healthText").textContent = "en línea · " + h.llm;
+  } catch {
+    $("healthDot").className = "dot err";
+    $("healthText").textContent = "sin conexión";
+  }
+}
+
+async function loadCalendar() {
+  try {
+    const r = await (await fetch(API + "/widgets/calendar")).json();
+    const events = r.events || [];
+    if (!events.length) { $("calendar").innerHTML = '<span class="empty">Sin eventos hoy.</span>'; return; }
+    $("calendar").innerHTML = events.map(e =>
+      '<div class="cal-item"><span class="t">' + esc(e.time || "") + '</span><span>' + esc(e.title || "") + '</span></div>'
+    ).join("");
+  } catch {
+    $("calendar").innerHTML = '<span class="empty">Calendario no disponible.</span>';
+  }
+}
+
+async function loadCaps() {
+  try {
+    const r = await (await fetch(API + "/tools")).json();
+    const tools = r.tools || [];
+    $("caps").innerHTML = tools.map(t => '<span class="cap">' + esc(t.name) + "</span>").join("");
+  } catch {
+    $("caps").innerHTML = '<span class="empty">—</span>';
+  }
+}
+
+async function loadGraph() {
+  try {
+    const g = await (await fetch(API + "/widgets/brain-graph")).json();
+    const nodes = g.nodes || [];
+    const links = (g.edges || []).map(e => ({ source: e.source, target: e.target }));
+    $("graphHint").textContent = nodes.length + " nota(s) · " + links.length + " enlace(s)";
+    const folders = [...new Set(nodes.map(n => n.folder || "root"))];
+    const palette = ["#38bdf8", "#34d399", "#fbbf24", "#f472b6", "#a78bfa", "#f87171"];
+    const colorOf = (f) => palette[folders.indexOf(f) % palette.length];
+    const el = document.getElementById("graph");
+    const Graph = ForceGraph()(el)
+      .width(el.clientWidth).height(260)
+      .backgroundColor("#0e131f")
+      .nodeLabel(n => (n.title || n.id) + (n.tags && n.tags.length ? "  #" + n.tags.join(" #") : ""))
+      .nodeColor(n => colorOf(n.folder || "root"))
+      .nodeRelSize(5)
+      .linkColor(() => "rgba(139,152,173,.4)")
+      .graphData({ nodes, links });
+    Graph.onNodeClick(n => { if (n.url) window.open(n.url, "_blank"); });
+  } catch (err) {
+    document.getElementById("graphHint").textContent = "Grafo no disponible.";
+  }
+}
+
+addMsg("assistant", "Hola Sebastian 👋 Soy Rebeca. ¿En qué te ayudo hoy?");
+loadHealth(); loadCalendar(); loadCaps(); loadGraph();
+setInterval(loadHealth, 30000);
+</script>
+</body>
+</html>
