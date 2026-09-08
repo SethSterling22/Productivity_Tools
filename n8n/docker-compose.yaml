@@ -36,6 +36,8 @@ services:
     # must be published HERE, not on the n8n service.
     ports:
       - "5678:5678"
+      # assistant-core (Jarvis brain) — reachable on the tailnet at this port.
+      - "8090:8090"
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}     # defined in .env — generates one at tailscale.com/settings/keys
       - TS_STATE_DIR=/var/lib/tailscale
@@ -132,6 +134,40 @@ services:
       # - ${HOME}/.ssh/hermes_id_ed25519:/workspace/.ssh/id_ed25519:ro
       # - ${HOME}/.ssh/known_hosts:/workspace/.ssh/known_hosts:ro
     depends_on:
+      tailscale:
+        condition: service_started
+
+
+  # ############################ assistant-core ############################
+  # The conversational "Jarvis" brain: LLM tool-calling loop, memory, and a
+  # streaming chat API shared by the dashboard and Telegram. Shares the Tailscale
+  # network so it reaches Hermes (localhost:8080), n8n webhooks (localhost:5678)
+  # and Ollama (MagicDNS) exactly like the other services. Its port is published
+  # on the "tailscale" service (8090). Tailnet-only: do NOT put it behind Funnel.
+  assistant-core:
+    image: assistant-core:local
+    build:
+      context: ../assistant-core
+    container_name: assistant_core
+    restart: always
+    network_mode: "service:tailscale"
+    environment:
+      - PORT=8090
+      # Reuse the existing Postgres instance (chat_* tables live alongside n8n's).
+      - DATABASE_URL=postgresql://n8n_admin:${POSTGRES_PASSWORD}@postgres:5432/n8n_db
+      # LLM: Claude primary, Ollama fallback (same targets Hermes uses).
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ASSISTANT_MODEL=${ASSISTANT_MODEL:-claude-sonnet-4-6}
+      - OLLAMA_URL=http://sadida.stegosaurus-panga.ts.net:11434
+      - ASSISTANT_FALLBACK_MODEL=${ASSISTANT_FALLBACK_MODEL:-qwen3.5:4b}
+      # Tool backends (same netns, so localhost).
+      - HERMES_URL=http://127.0.0.1:8080
+      - N8N_WEBHOOK_BASE=http://127.0.0.1:5678/webhook
+      # Dashboard auth allowlist (used in WS-E; safe to set now).
+      - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
       tailscale:
         condition: service_started
 
