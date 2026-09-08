@@ -1,0 +1,57 @@
+{
+  "name": "tool · list_today_events",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tool/list_today_events",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh-list-events-0001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "tool-list-today-events"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": { "__rl": true, "mode": "list", "value": "primary" },
+        "returnAll": false,
+        "limit": 50,
+        "options": {
+          "timeMin": "={{ $now.setZone('America/Puerto_Rico').startOf('day').toISO() }}",
+          "timeMax": "={{ $now.setZone('America/Puerto_Rico').endOf('day').toISO() }}",
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      },
+      "id": "gcal-list-events-0002",
+      "name": "Calendar today",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [460, 300],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": { "id": "YOUR_GOOGLE_CAL_CRED", "name": "Google Calendar" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all event items into a single JSON response.\nconst tz = 'America/Puerto_Rico';\nconst events = $input.all().map(i => i.json).filter(e => e && (e.id || e.summary));\nconst out = events.map(function (e) {\n  const dt = e.start && e.start.dateTime;\n  let time = 'all-day';\n  if (dt) { try { time = new Date(dt).toLocaleTimeString('es-PR', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (x) {} }\n  return { time, title: e.summary || '(sin título)', start: (e.start && (e.start.dateTime || e.start.date)) || null };\n});\nreturn [{ json: { ok: true, count: out.length, events: out } }];"
+      },
+      "id": "parse-list-events-0003",
+      "name": "Shape response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Calendar today", "type": "main", "index": 0 }]] },
+    "Calendar today": { "main": [[{ "node": "Shape response", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

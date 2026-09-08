@@ -316,6 +316,71 @@ const TOOLS = {
     return lines.length ? `${header}\n${lines.join("\n")}` : `${header}\n(vacío)`;
   },
 
+  // Read-only graph of the second brain for the dashboard widget.
+  // Nodes = notes; edges = [[wikilinks]] resolved to other notes. Tags and
+  // folder are attached to each node (for coloring). Never writes anything.
+  brain_graph: async ({ subdir } = {}) => {
+    const cleanSub = (subdir || "").replace(/[^A-Za-z0-9/_-]/g, "");
+    const root     = cleanSub ? path.join(BRAIN_ROOT, cleanSub) : BRAIN_ROOT;
+    const webBase  = (process.env.HERMES_BRAIN_WEB_URL || "").replace(/\/+$/, "");
+    const branch   = BRAIN_GIT_BRANCH;
+
+    const files   = [];         // { rel, base, title, tags[], links[], folder }
+    const byName  = new Map();  // lowercased title/basename -> rel (node id)
+
+    async function walk(dir, rel) {
+      let entries;
+      try { entries = await fs.readdir(dir, { withFileTypes: true }); }
+      catch (e) { return; }
+      for (const e of entries) {
+        if (e.name === ".git") continue;
+        const childRel = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory()) {
+          await walk(path.join(dir, e.name), childRel);
+        } else if (e.name.endsWith(".md")) {
+          let content = "";
+          try { content = await fs.readFile(path.join(dir, e.name), "utf8"); } catch (_) {}
+          const base = e.name.replace(/\.md$/, "");
+          let title = base;
+          const fmTitle = content.match(/^---[\s\S]*?\ntitle:\s*"?([^"\n]+)"?/);
+          if (fmTitle) title = fmTitle[1].trim();
+
+          const tags = new Set();
+          const fmTags = content.match(/\ntags:\s*\[([^\]]*)\]/);
+          if (fmTags) fmTags[1].split(",").map((s) => s.replace(/["'\s]/g, "")).filter(Boolean).forEach((t) => tags.add(t));
+          for (const m of content.matchAll(/(?:^|\s)#([A-Za-z0-9_\/-]+)/g)) tags.add(m[1]);
+
+          const links = [];
+          for (const m of content.matchAll(/\[\[([^\]]+)\]\]/g)) {
+            links.push(m[1].split("|")[0].split("#")[0].trim());
+          }
+
+          const folder = childRel.includes("/") ? childRel.split("/").slice(0, -1).join("/") : "";
+          files.push({ rel: childRel, base, title, tags: [...tags], links, folder });
+          byName.set(title.toLowerCase(), childRel);
+          byName.set(base.toLowerCase(), childRel);
+        }
+      }
+    }
+    await walk(root, cleanSub);
+
+    const nodes = files.map((f) => ({
+      id: f.rel,
+      title: f.title,
+      folder: f.folder,
+      tags: f.tags,
+      url: webBase ? `${webBase}/blob/${branch}/${f.rel.split("/").map(encodeURIComponent).join("/")}` : "",
+    }));
+    const edges = [];
+    for (const f of files) {
+      for (const l of f.links) {
+        const target = byName.get(l.toLowerCase());
+        if (target && target !== f.rel) edges.push({ source: f.rel, target, type: "link" });
+      }
+    }
+    return { nodes, edges, counts: { notes: nodes.length, links: edges.length } };
+  },
+
   ollama_chat: async (args) => ollamaChat(args),
 
   claude_chat: async ({ prompt, system, max_tokens, temperature }) => {
