@@ -1,12 +1,34 @@
 // Postgres access: a single pool, startup migration, and thin query helpers.
-import fs from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { config } from "./config.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { Pool } = pg;
+
+// Schema is inlined (not read from a file) so it can never be missed by a
+// Docker build. Keep migrations/001_init.sql in sync for reference/tooling.
+const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS chat_session (
+  id          TEXT PRIMARY KEY,
+  channel     TEXT NOT NULL,
+  title       TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS chat_message (
+  id          BIGSERIAL PRIMARY KEY,
+  session_id  TEXT NOT NULL REFERENCES chat_session(id) ON DELETE CASCADE,
+  role        TEXT NOT NULL,
+  content     TEXT,
+  tool_calls  JSONB,
+  tool_name   TEXT,
+  tool_result JSONB,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_message_session
+  ON chat_message (session_id, created_at);
+`;
 
 let pool = null;
 
@@ -22,12 +44,10 @@ export function getPool() {
   return pool;
 }
 
-// Run the SQL migrations on startup. Safe to call repeatedly (IF NOT EXISTS).
+// Run the schema migration on startup. Safe to call repeatedly (IF NOT EXISTS).
 export async function migrate() {
   if (!hasDb()) return;
-  const file = path.join(__dirname, "..", "migrations", "001_init.sql");
-  const sql = await fs.readFile(file, "utf8");
-  await getPool().query(sql);
+  await getPool().query(SCHEMA_SQL);
 }
 
 export async function ensureSession(id, channel, title) {
