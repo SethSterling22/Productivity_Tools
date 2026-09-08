@@ -11,7 +11,12 @@ function list(v) {
   return (v || "").split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+// Assistant persona name (the project is "Cerebro"; the assistant is "Rebeca").
+const assistantName = process.env.ASSISTANT_NAME || "Rebeca";
+
 export const config = {
+  assistantName,
+
   port: Number(process.env.PORT || 8090),
 
   // ── LLM: Anthropic primary, Ollama fallback ────────────────────────────────
@@ -43,7 +48,7 @@ export const config = {
   systemPrompt:
     process.env.ASSISTANT_SYSTEM_PROMPT ||
     [
-      "You are Cerebro, the personal assistant of Sebastian Sterling, DevSecOps Engineer at Expert Radiology (Puerto Rico).",
+      `You are ${assistantName}, the personal assistant of Sebastian Sterling, DevSecOps Engineer at Expert Radiology (Puerto Rico).`,
       "You help with productivity: tasks (Linear), notes (the git-backed second brain), calendar (Google Calendar), and general questions.",
       "You have context on his k3s home lab (Sadida, Ocra, Sram, Xelor, Sacro, Aery).",
       "Be direct, concise and technical. Respond in the user's language (usually Spanish).",
