@@ -37,9 +37,9 @@ services:
     ports:
       - "5678:5678"
       # assistant-core (Jarvis brain) — reachable on the tailnet at this port.
-      # 8090 (homelab_control_api) and 8091 (homelab_shelly_exporter) are taken
-      # on this host, so we use 8095.
-      - "8095:8095"
+      # Use the 4000 range to stay clear of the homelab services (8000/9000).
+      # 4001 is reserved for the Phase 1 dashboard.
+      - "4000:4000"
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}     # defined in .env — generates one at tailscale.com/settings/keys
       - TS_STATE_DIR=/var/lib/tailscale
@@ -154,7 +154,7 @@ services:
     restart: always
     network_mode: "service:tailscale"
     environment:
-      - PORT=8095
+      - PORT=4000
       # Reuse the existing Postgres instance (chat_* tables live alongside n8n's).
       - DATABASE_URL=postgresql://n8n_admin:${POSTGRES_PASSWORD}@postgres:5432/n8n_db
       # LLM: Claude primary, Ollama fallback (same targets Hermes uses).
