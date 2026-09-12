@@ -1,0 +1,38 @@
+# Voice services for Sadida (GPU node). Reachable on the tailnet as
+#   http://sadida.stegosaurus-panga.ts.net:8100  (Whisper STT)
+#   http://sadida.stegosaurus-panga.ts.net:8200  (Piper TTS)
+# Prereqs on Sadida: Docker + NVIDIA Container Toolkit (for --gpus / device reservations).
+
+services:
+  whisper:
+    image: whisper-stt:local
+    build:
+      context: ./whisper
+    container_name: whisper_stt
+    restart: always
+    ports:
+      - "8100:8100"
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-small}
+      - WHISPER_DEVICE=cuda
+      - WHISPER_COMPUTE=${WHISPER_COMPUTE:-float16}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  piper:
+    image: piper-tts:local
+    build:
+      context: ./piper
+    container_name: piper_tts
+    restart: always
+    ports:
+      - "8200:8200"
+    environment:
+      - PIPER_VOICE=/voices/${PIPER_VOICE_FILE:-es_MX-ald-medium.onnx}
+    volumes:
+      - ./voices:/voices:ro

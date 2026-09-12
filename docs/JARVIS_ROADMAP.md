@@ -178,7 +178,11 @@ that makes the assistant "adapt easily to any future n8n tool."
 - Add a `brain_graph` tool to Hermes (parse vault: notes as nodes, `[[wikilinks]]`
   and shared tags as edges) returning `{nodes, edges}` JSON.
 
-### Phase 1 — Dashboard + interactive text chat  ← START HERE
+### Phase 1 — Dashboard + interactive text chat  ✅ DONE
+<!-- assistant-core (Rebeca), tool webhooks, brain_graph, dashboard (chat+widgets),
+     Google OAuth login (tailnet + Serve HTTPS), and Telegram free-text delegation
+     are all built and deployed. -->
+
 - SPA (React + Vite), served by a container, **tailnet-only**.
 - Chat panel with streaming responses (SSE) against assistant-core.
 - Calendar widget (today's Google Calendar events).
