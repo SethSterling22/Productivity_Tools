@@ -65,7 +65,11 @@
     background: var(--lime); color: #0d0d0d; text-transform: uppercase; letter-spacing: 1px; font-size: 12px;
   }
   .composer button:disabled { opacity: .45; cursor: default; }
-  .composer .mic { background: transparent; color: var(--muted); border: 1px solid var(--border); cursor: not-allowed; padding: 0 12px; }
+  .composer .mic { background: transparent; color: var(--muted); border: 1px solid var(--border); cursor: pointer; padding: 0 12px; font-family: var(--mono); font-size: 12px; }
+  .composer .mic:hover { color: var(--text); border-color: var(--border-hi); }
+  .composer .mic.rec { color: #0d0d0d; background: var(--coral); border-color: var(--coral); animation: pulse 1s infinite; }
+  .composer .mic.busy { opacity: .6; cursor: default; }
+  @keyframes pulse { 50% { opacity: .55; } }
 
   /* ── Sidebar ── */
   .side { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; background: var(--bg); }
@@ -105,7 +109,7 @@
     </div>
     <div class="messages" id="messages"></div>
     <div class="composer">
-      <button class="mic" title="Voz — próximamente (Fase 2)">MIC</button>
+      <button class="mic" id="mic" title="Hablar (clic para grabar, clic para enviar)">MIC</button>
       <textarea id="input" rows="1" placeholder="Escribe a Rebeca…  (Enter para enviar)"></textarea>
       <button id="send">Enviar</button>
     </div>
@@ -156,7 +160,8 @@ function addTool(name, label) {
   messages.scrollTop = messages.scrollHeight;
 }
 
-async function send() {
+async function send(opts) {
+  const speak = !!(opts && opts.speak);
   const input = $("input");
   const text = input.value.trim();
   if (!text) return;
@@ -165,6 +170,7 @@ async function send() {
   addMsg("user", text);
   let asstEl = null;
   let buffer = "";
+  let finalText = "";
 
   try {
     const res = await fetch(API + "/chat/stream", {
@@ -187,11 +193,12 @@ async function send() {
           const data = JSON.parse(line.slice(5).trim());
           if (event === "tool_call") addTool(data.name, "→ llamando");
           else if (event === "tool_result") addTool(data.name, "✓ resultado de");
-          else if (event === "text") { if (data.text) { if (!asstEl) asstEl = addMsg("assistant", ""); asstEl.innerHTML = linkify(data.text); messages.scrollTop = messages.scrollHeight; } }
+          else if (event === "text") { if (data.text) { finalText = data.text; if (!asstEl) asstEl = addMsg("assistant", ""); asstEl.innerHTML = linkify(data.text); messages.scrollTop = messages.scrollHeight; } }
           else if (event === "error") addMsg("assistant", "⚠ " + (data.message || "error"));
         }
       }
     }
+    if (speak && finalText) speakText(finalText);
   } catch (err) {
     addMsg("assistant", "⚠ No pude conectar: " + err.message);
   } finally {
@@ -201,7 +208,54 @@ async function send() {
   }
 }
 
-$("send").onclick = send;
+$("send").onclick = () => send();
+
+// ── Voice: push-to-talk (record → transcribe → send → speak reply) ──
+let mediaRecorder = null, chunks = [], recording = false;
+
+async function toggleMic() {
+  const mic = $("mic");
+  if (recording) { // stop
+    recording = false;
+    mic.classList.remove("rec");
+    if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+    return;
+  }
+  // start
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { addMsg("assistant", "⚠ No pude acceder al micrófono: " + e.message); return; }
+  chunks = [];
+  mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+    mic.classList.add("busy"); mic.textContent = "…";
+    try {
+      const r = await fetch(API + "/voice/transcribe", { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
+      const j = await r.json();
+      if (j.ok && j.text) { $("input").value = j.text; send({ speak: true }); }
+      else addMsg("assistant", "⚠ No entendí el audio.");
+    } catch (e) { addMsg("assistant", "⚠ Error de transcripción: " + e.message); }
+    finally { mic.classList.remove("busy"); mic.textContent = "MIC"; }
+  };
+  mediaRecorder.start();
+  recording = true;
+  mic.classList.add("rec"); mic.textContent = "● REC";
+}
+
+async function speakText(text) {
+  try {
+    const r = await fetch(API + "/voice/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    if (!r.ok) return;
+    const buf = await r.blob();
+    const audio = new Audio(URL.createObjectURL(buf));
+    audio.play().catch(() => {});
+  } catch (e) { /* ignore playback errors */ }
+}
+
+$("mic").onclick = toggleMic;
 $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });

@@ -116,6 +116,46 @@ app.get("/widgets/brain-graph", async () => {
   }
 });
 
+// ── Voice proxies (STT/TTS). Deployment-agnostic: point WHISPER_URL/PIPER_URL
+//    at Ocra (CPU) now, or a GPU host later — no code change. ──────────────────
+// Accept raw audio bytes from the browser (MediaRecorder) and forward to Whisper.
+app.addContentTypeParser(
+  ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "application/octet-stream"],
+  { parseAs: "buffer" },
+  (req, body, done) => done(null, body)
+);
+
+app.post("/voice/transcribe", async (req, reply) => {
+  try {
+    const ct = req.headers["content-type"] || "audio/webm";
+    const fd = new FormData();
+    fd.append("file", new Blob([req.body], { type: ct }), "audio.webm");
+    const res = await fetch(`${config.whisperUrl}/transcribe`, { method: "POST", body: fd });
+    const j = await res.json();
+    return { ok: j.ok !== false, text: j.text || "", language: j.language };
+  } catch (err) {
+    return reply.code(502).send({ ok: false, error: "STT failed: " + err.message });
+  }
+});
+
+app.post("/voice/speak", async (req, reply) => {
+  const text = (req.body && req.body.text) || "";
+  if (!text.trim()) return reply.code(400).send({ ok: false, error: "empty text" });
+  try {
+    const res = await fetch(`${config.piperUrl}/speak`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return reply.code(502).send({ ok: false, error: "TTS failed" });
+    const buf = Buffer.from(await res.arrayBuffer());
+    reply.header("Content-Type", "audio/wav");
+    return reply.send(buf);
+  } catch (err) {
+    return reply.code(502).send({ ok: false, error: "TTS failed: " + err.message });
+  }
+});
+
 app.post("/chat", async (req, reply) => {
   const { session_id, message, channel } = req.body || {};
   if (!session_id || !message) {

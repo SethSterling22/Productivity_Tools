@@ -32,6 +32,10 @@ export const config = {
   hermesUrl: process.env.HERMES_URL || "http://127.0.0.1:8080",
   n8nWebhookBase: process.env.N8N_WEBHOOK_BASE || "http://127.0.0.1:5678/webhook",
 
+  // ── Voice services (STT/TTS) ───────────────────────────────────────────────
+  whisperUrl: process.env.WHISPER_URL || "http://whisper:8100",
+  piperUrl: process.env.PIPER_URL || "http://piper:8200",
+
   // ── Persistence ────────────────────────────────────────────────────────────
   databaseUrl: process.env.DATABASE_URL || "",
   memoryWindow: Number(process.env.MEMORY_WINDOW || 20), // turns kept in context
