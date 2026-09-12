@@ -2,7 +2,8 @@
 # Move to the GPU Dockerfile on Sadida once its NVIDIA driver is healthy.
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+# ffmpeg for audio decoding; libgomp1 is required by ctranslate2 (faster-whisper).
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
