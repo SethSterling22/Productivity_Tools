@@ -35,7 +35,7 @@
     },
     {
       "name": "list_today_events",
-      "description": "List the user's Google Calendar events for today.",
+      "description": "List the user's upcoming Google Calendar events (from now through the next 7 days), sorted, with date and time.",
       "input_schema": { "type": "object", "properties": {} },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/list_today_events" },
       "channels": ["dashboard", "telegram"],

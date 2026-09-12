@@ -79,7 +79,7 @@
   .card .body { padding: 12px 14px; }
   .cal-item { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); }
   .cal-item:last-child { border-bottom: none; }
-  .cal-item .t { color: var(--lime); font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 60px; }
+  .cal-item .t { color: var(--lime); font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 92px; font-size: 12px; line-height: 1.35; }
   .empty { color: var(--muted); font-style: italic; }
   .caps { display: flex; flex-wrap: wrap; gap: 6px; }
   .cap {
@@ -111,7 +111,7 @@
 
   <aside class="side">
     <div class="card">
-      <h2>Agenda de hoy</h2>
+      <h2>Próximos eventos</h2>
       <div class="body" id="calendar"><span class="empty">Cargando…</span></div>
     </div>
     <div class="card">
@@ -220,9 +220,9 @@ async function loadCalendar() {
   try {
     const r = await (await fetch(API + "/widgets/calendar")).json();
     const events = r.events || [];
-    if (!events.length) { $("calendar").innerHTML = '<span class="empty">Sin eventos hoy.</span>'; return; }
+    if (!events.length) { $("calendar").innerHTML = '<span class="empty">Sin eventos próximos.</span>'; return; }
     $("calendar").innerHTML = events.map(e =>
-      '<div class="cal-item"><span class="t">' + esc(e.time || "") + '</span><span>' + esc(e.title || "") + '</span></div>'
+      '<div class="cal-item"><span class="t">' + esc(e.date || "") + '<br>' + esc(e.time || "") + '</span><span>' + esc(e.title || "") + '</span></div>'
     ).join("");
   } catch {
     $("calendar").innerHTML = '<span class="empty">Calendario no disponible.</span>';
@@ -266,6 +266,7 @@ async function loadGraph() {
 addMsg("assistant", "Hola Sebastian 👋 Soy Rebeca. ¿En qué te ayudo hoy?");
 loadHealth(); loadCalendar(); loadCaps(); loadGraph();
 setInterval(loadHealth, 30000);
+setInterval(loadCalendar, 300000); // keep upcoming events fresh (every 5 min)
 </script>
 </body>
 </html>

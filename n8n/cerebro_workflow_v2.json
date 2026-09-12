@@ -792,8 +792,8 @@
         "returnAll": false,
         "limit": 50,
         "options": {
-          "timeMin": "={{ $now.setZone('America/Puerto_Rico').startOf('day').toISO() }}",
-          "timeMax": "={{ $now.setZone('America/Puerto_Rico').endOf('day').toISO() }}",
+          "timeMin": "={{ $now.setZone('America/Puerto_Rico').toISO() }}",
+          "timeMax": "={{ $now.setZone('America/Puerto_Rico').plus({ days: 7 }).toISO() }}",
           "singleEvents": true,
           "orderBy": "startTime"
         }
@@ -816,7 +816,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Format today's Google Calendar events into a Telegram message.\nconst tz = 'America/Puerto_Rico';\nconst events = $input.all().map(i => i.json).filter(e => e && (e.id || e.summary));\nif (!events.length) {\n  return [{ json: { response_text: '📅 No tienes eventos para hoy.', source: 'Calendar' } }];\n}\nconst lines = events.map(function (e) {\n  let t;\n  if (e.start && e.start.dateTime) {\n    try { t = new Date(e.start.dateTime).toLocaleTimeString('es-PR', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); }\n    catch (x) { t = ''; }\n  } else {\n    t = 'Todo el día';\n  }\n  return '• ' + t + ' — ' + (e.summary || '(sin título)');\n});\nconst today = new Date().toLocaleDateString('es-PR', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long' });\nreturn [{ json: { response_text: '📅 Agenda de hoy (' + today + '):\\n\\n' + lines.join('\\n'), source: 'Calendar' } }];"
+        "jsCode": "// Upcoming events (next 7 days) for Telegram: drop finished, sort, date + time.\nconst tz = 'America/Puerto_Rico';\nconst now = Date.now();\nfunction startRaw(e) { return (e.start && (e.start.dateTime || e.start.date)) || null; }\nfunction endMs(e) { const r = (e.end && (e.end.dateTime || e.end.date)) || startRaw(e); const t = Date.parse(r); return isNaN(t) ? now : t; }\nconst events = $input.all().map(i => i.json).filter(e => e && (e.id || e.summary) && endMs(e) >= now);\nif (!events.length) {\n  return [{ json: { response_text: '📅 No tienes eventos próximos.', source: 'Calendar' } }];\n}\nevents.sort((a, b) => String(startRaw(a)).localeCompare(String(startRaw(b))));\nconst lines = events.map(function (e) {\n  const r = startRaw(e);\n  let date = '';\n  try { date = new Date(r).toLocaleDateString('es-PR', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' }); } catch (x) {}\n  let t;\n  if (e.start && e.start.dateTime) { try { t = new Date(e.start.dateTime).toLocaleTimeString('es-PR', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (x) { t = ''; } }\n  else { t = 'Todo el día'; }\n  return '• ' + date + ' · ' + t + ' — ' + (e.summary || '(sin título)');\n});\nreturn [{ json: { response_text: '📅 Próximos eventos:\\n\\n' + lines.join('\\n'), source: 'Calendar' } }];"
       },
       "id": "d2e3f4a5-0002-4b10-9c20-calparse000002",
       "name": "Parse calendar",
@@ -945,6 +945,61 @@
       "position": [
         2640,
         880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Free-text (non slash-command) goes to Rebeca (assistant-core), which has\n// memory + tool-calling. Session is keyed by the Telegram chat id.\nconst d = $input.first().json;\nconst body = {\n  session_id: 'telegram:' + d.chat_id,\n  message: d.raw_text || '',\n  channel: 'telegram'\n};\nreturn [{ json: { requestBody: JSON.stringify(body), chat_id: d.chat_id } }];"
+      },
+      "id": "f5a6b7c8-0001-4c10-9d20-rebecabuild001",
+      "name": "Build Rebeca request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4000/chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "f5a6b7c8-0002-4c10-9d20-rebecahttp0002",
+      "name": "Hermes → Rebeca",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1240,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst chat_id = $('Build Rebeca request').first().json.chat_id;\nconst text = r && r.ok ? r.response : ('⚠️ Rebeca no respondió: ' + ((r && r.error) || 'error'));\nreturn [{ json: { chat_id: chat_id, response_text: text, footer: '' } }];"
+      },
+      "id": "f5a6b7c8-0003-4c10-9d20-rebecaparse003",
+      "name": "Parse Rebeca",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        620
       ]
     }
   ],
@@ -1194,7 +1249,40 @@
         ],
         [
           {
-            "node": "Hermes — Classify intent",
+            "node": "Build Rebeca request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Rebeca request": {
+      "main": [
+        [
+          {
+            "node": "Hermes → Rebeca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hermes → Rebeca": {
+      "main": [
+        [
+          {
+            "node": "Parse Rebeca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Rebeca": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Send",
             "type": "main",
             "index": 0
           }

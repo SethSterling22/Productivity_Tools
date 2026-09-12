@@ -127,8 +127,8 @@
         "returnAll": false,
         "limit": 50,
         "options": {
-          "timeMin": "={{ $now.setZone('America/Puerto_Rico').startOf('day').toISO() }}",
-          "timeMax": "={{ $now.setZone('America/Puerto_Rico').endOf('day').toISO() }}",
+          "timeMin": "={{ $now.setZone('America/Puerto_Rico').toISO() }}",
+          "timeMax": "={{ $now.setZone('America/Puerto_Rico').plus({ days: 7 }).toISO() }}",
           "singleEvents": true,
           "orderBy": "startTime"
         }
@@ -143,7 +143,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const tz = 'America/Puerto_Rico';\nconst events = $input.all().map(i => i.json).filter(e => e && (e.id || e.summary));\nconst out = events.map(function (e) {\n  const dt = e.start && e.start.dateTime;\n  let time = 'all-day';\n  if (dt) { try { time = new Date(dt).toLocaleTimeString('es-PR', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (x) {} }\n  return { time, title: e.summary || '(sin título)', start: (e.start && (e.start.dateTime || e.start.date)) || null };\n});\nreturn [{ json: { ok: true, count: out.length, events: out } }];"
+        "jsCode": "// Upcoming events (next 7 days): drop finished ones, sort, format date + time.\nconst tz = 'America/Puerto_Rico';\nconst now = Date.now();\nfunction startRaw(e) { return (e.start && (e.start.dateTime || e.start.date)) || null; }\nfunction endMs(e) { const r = (e.end && (e.end.dateTime || e.end.date)) || startRaw(e); const t = Date.parse(r); return isNaN(t) ? now : t; }\nfunction fmtDate(e) {\n  const r = startRaw(e); if (!r) return '';\n  try { return new Date(r).toLocaleDateString('es-PR', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' }); } catch (x) { return ''; }\n}\nfunction fmtTime(e) {\n  if (e.start && e.start.dateTime) { try { return new Date(e.start.dateTime).toLocaleTimeString('es-PR', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); } catch (x) {} }\n  return 'Todo el día';\n}\nconst all = $input.all().map(i => i.json).filter(e => e && (e.id || e.summary));\nconst upcoming = all.filter(e => endMs(e) >= now);\nupcoming.sort((a, b) => String(startRaw(a)).localeCompare(String(startRaw(b))));\nconst out = upcoming.map(e => ({ date: fmtDate(e), time: fmtTime(e), title: e.summary || '(sin título)', start: startRaw(e) }));\nreturn [{ json: { ok: true, count: out.length, events: out } }];"
       },
       "id": "shape-list-events-0003",
       "name": "Shape events response",
