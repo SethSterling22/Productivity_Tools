@@ -165,8 +165,9 @@ services:
       # Tool backends (same netns, so localhost).
       - HERMES_URL=http://127.0.0.1:8080
       - N8N_WEBHOOK_BASE=http://127.0.0.1:5678/webhook
-      # Voice services (reached by Docker DNS name on n8n_network).
-      - WHISPER_URL=${WHISPER_URL:-http://whisper:8100}
+      # Voice services. Whisper runs on Sadida's GPU (external, over the tailnet);
+      # Piper runs locally on Ocra (Docker DNS name on n8n_network).
+      - WHISPER_URL=${WHISPER_URL:-http://sadida.stegosaurus-panga.ts.net:8100}
       - PIPER_URL=${PIPER_URL:-http://piper:8200}
       # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).
       - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
@@ -182,22 +183,29 @@ services:
 
 
   # ############################ Voice services (Phase 2) ############################
-  # Whisper (STT) + Piper (TTS) on Ocra (CPU) while Sadida's GPU driver is fixed.
-  # assistant-core reaches them by name on n8n_network (WHISPER_URL / PIPER_URL).
-  # To move to GPU later: deploy the same images on a GPU host and repoint the URLs.
-  whisper:
-    image: whisper-stt:cpu
-    build:
-      context: ../voice-services/whisper
-      dockerfile: Dockerfile.cpu
-    container_name: whisper_stt
-    restart: always
-    environment:
-      - WHISPER_MODEL=${WHISPER_MODEL:-small}
-      - WHISPER_DEVICE=cpu
-      - WHISPER_COMPUTE=int8
-    networks:
-      - n8n_network
+  # Piper (TTS) runs here on Ocra (CPU, fast enough).
+  #
+  # Whisper (STT) now runs EXTERNALLY on Sadida's GPU (Docker + NVIDIA Container
+  # Toolkit), reachable over the tailnet. assistant-core points at it via
+  #   WHISPER_URL=http://sadida.stegosaurus-panga.ts.net:8100
+  # See voice-services/whisper/docker-compose.gpu.yaml (deployed on Sadida).
+  #
+  # The old Ocra CPU Whisper is kept commented as a fallback (uncomment + set
+  # WHISPER_URL=http://whisper:8100 to run STT locally on CPU again):
+  #
+  # whisper:
+  #   image: whisper-stt:cpu
+  #   build:
+  #     context: ../voice-services/whisper
+  #     dockerfile: Dockerfile.cpu
+  #   container_name: whisper_stt
+  #   restart: always
+  #   environment:
+  #     - WHISPER_MODEL=${WHISPER_MODEL:-small}
+  #     - WHISPER_DEVICE=cpu
+  #     - WHISPER_COMPUTE=int8
+  #   networks:
+  #     - n8n_network
 
   piper:
     image: piper-tts:local
