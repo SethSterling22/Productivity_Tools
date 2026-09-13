@@ -119,11 +119,9 @@ app.get("/widgets/brain-graph", async () => {
 // ── Voice proxies (STT/TTS). Deployment-agnostic: point WHISPER_URL/PIPER_URL
 //    at Ocra (CPU) now, or a GPU host later — no code change. ──────────────────
 // Accept raw audio bytes from the browser (MediaRecorder) and forward to Whisper.
-app.addContentTypeParser(
-  ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "application/octet-stream"],
-  { parseAs: "buffer" },
-  (req, body, done) => done(null, body)
-);
+// Accept any audio/* (incl. "audio/webm;codecs=opus") plus octet-stream as raw bytes.
+app.addContentTypeParser(/^audio\//, { parseAs: "buffer" }, (req, body, done) => done(null, body));
+app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (req, body, done) => done(null, body));
 
 // Pick the first host that answers /health within ~1.5s (preference order).
 // Falls back to the last host if none respond, so we still attempt the request.
