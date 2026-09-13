@@ -224,6 +224,7 @@ async function toggleMic() {
     return;
   }
   // start
+  ensureAudio();  // unlock audio playback within this user gesture
   stopSpeaking(); // starting a new recording cuts any playback
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
@@ -248,9 +249,15 @@ async function toggleMic() {
   mic.classList.add("rec"); mic.textContent = "● REC";
 }
 
-let currentAudio = null;
+// Web Audio API (works around autoplay blocking of delayed audio.play()).
+let audioCtx = null, currentSource = null;
+function ensureAudio() {
+  // Must be called from a user gesture (e.g. the MIC click) to unlock playback.
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
 function stopSpeaking() {
-  if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+  if (currentSource) { try { currentSource.stop(); } catch (e) {} currentSource = null; }
   $("stopVoice").style.display = "none";
 }
 async function speakText(text) {
@@ -258,12 +265,17 @@ async function speakText(text) {
   try {
     const r = await fetch(API + "/voice/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
     if (!r.ok) return;
-    const buf = await r.blob();
-    const audio = new Audio(URL.createObjectURL(buf));
-    currentAudio = audio;
+    const arr = await r.arrayBuffer();
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    const buf = await audioCtx.decodeAudioData(arr);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioCtx.destination);
+    src.onended = () => { if (currentSource === src) { currentSource = null; $("stopVoice").style.display = "none"; } };
+    currentSource = src;
     $("stopVoice").style.display = "";
-    audio.onended = () => { if (currentAudio === audio) { currentAudio = null; $("stopVoice").style.display = "none"; } };
-    audio.play().catch(() => { $("stopVoice").style.display = "none"; });
+    src.start(0);
   } catch (e) { $("stopVoice").style.display = "none"; }
 }
 
