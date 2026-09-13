@@ -125,14 +125,32 @@ app.addContentTypeParser(
   (req, body, done) => done(null, body)
 );
 
+// Pick the first host that answers /health within ~1.5s (preference order).
+// Falls back to the last host if none respond, so we still attempt the request.
+async function pickHost(urls) {
+  for (const base of urls) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 1500);
+    try {
+      const r = await fetch(`${base}/health`, { signal: ctl.signal });
+      clearTimeout(t);
+      if (r.ok) return base;
+    } catch (_) {
+      clearTimeout(t);
+    }
+  }
+  return urls[urls.length - 1];
+}
+
 app.post("/voice/transcribe", async (req, reply) => {
   try {
     const ct = req.headers["content-type"] || "audio/webm";
+    const base = await pickHost(config.whisperUrls);
     const fd = new FormData();
     fd.append("file", new Blob([req.body], { type: ct }), "audio.webm");
-    const res = await fetch(`${config.whisperUrl}/transcribe`, { method: "POST", body: fd });
+    const res = await fetch(`${base}/transcribe`, { method: "POST", body: fd });
     const j = await res.json();
-    return { ok: j.ok !== false, text: j.text || "", language: j.language };
+    return { ok: j.ok !== false, text: j.text || "", language: j.language, host: base };
   } catch (err) {
     return reply.code(502).send({ ok: false, error: "STT failed: " + err.message });
   }
@@ -157,7 +175,8 @@ app.post("/voice/speak", async (req, reply) => {
   const text = forSpeech((req.body && req.body.text) || "");
   if (!text.trim()) return reply.code(400).send({ ok: false, error: "empty text" });
   try {
-    const res = await fetch(`${config.piperUrl}/speak`, {
+    const base = await pickHost(config.piperUrls);
+    const res = await fetch(`${base}/speak`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ text }),

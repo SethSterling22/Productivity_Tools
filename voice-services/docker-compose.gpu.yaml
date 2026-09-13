@@ -1,0 +1,45 @@
+# Full voice stack (Whisper STT on GPU + Piper TTS) for ANY host with an NVIDIA
+# GPU + NVIDIA Container Toolkit. Deploy the SAME file on each GPU host (sadida,
+# omarchy). assistant-core load-balances/fails-over between them (WHISPER_URLS /
+# PIPER_URLS, omarchy preferred, sadida fallback).
+#
+#   docker compose -f docker-compose.gpu.yaml up -d --build
+#
+# Reachable at  <host>:8100 (Whisper)  and  <host>:8200 (Piper)  over the tailnet.
+# Put the Piper voice model(s) in ./voices on each host.
+
+services:
+  whisper:
+    image: whisper-stt:gpu
+    build:
+      context: ./whisper
+      dockerfile: Dockerfile
+    container_name: whisper_stt
+    restart: always
+    ports:
+      - "8100:8100"
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-small}
+      - WHISPER_DEVICE=cuda
+      - WHISPER_COMPUTE=${WHISPER_COMPUTE:-float16}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  piper:
+    image: piper-tts:local
+    build:
+      context: ./piper
+    container_name: piper_tts
+    restart: always
+    ports:
+      - "8200:8200"
+    environment:
+      - PIPER_VOICE=/voices/${PIPER_VOICE_FILE:-es_AR-daniela-high.onnx}
+      - PIPER_SPEAKER=${PIPER_SPEAKER:-}
+    volumes:
+      - ./voices:/voices:ro

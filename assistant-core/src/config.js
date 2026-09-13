@@ -33,8 +33,15 @@ export const config = {
   n8nWebhookBase: process.env.N8N_WEBHOOK_BASE || "http://127.0.0.1:5678/webhook",
 
   // ── Voice services (STT/TTS) ───────────────────────────────────────────────
-  whisperUrl: process.env.WHISPER_URL || "http://whisper:8100",
-  piperUrl: process.env.PIPER_URL || "http://piper:8200",
+  // Preference-ordered lists: assistant-core uses the first host that answers a
+  // quick /health (e.g. omarchy when your desktop is on, else sadida).
+  // WHISPER_URLS / PIPER_URLS are comma-separated; fall back to the single *_URL.
+  whisperUrls: list(process.env.WHISPER_URLS).length
+    ? list(process.env.WHISPER_URLS)
+    : [process.env.WHISPER_URL || "http://whisper:8100"],
+  piperUrls: list(process.env.PIPER_URLS).length
+    ? list(process.env.PIPER_URLS)
+    : [process.env.PIPER_URL || "http://piper:8200"],
 
   // ── Persistence ────────────────────────────────────────────────────────────
   databaseUrl: process.env.DATABASE_URL || "",

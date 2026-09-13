@@ -165,10 +165,11 @@ services:
       # Tool backends (same netns, so localhost).
       - HERMES_URL=http://127.0.0.1:8080
       - N8N_WEBHOOK_BASE=http://127.0.0.1:5678/webhook
-      # Voice services. Whisper runs on Sadida's GPU (external, over the tailnet);
-      # Piper runs locally on Ocra (Docker DNS name on n8n_network).
-      - WHISPER_URL=${WHISPER_URL:-http://sadida.stegosaurus-panga.ts.net:8100}
-      - PIPER_URL=${PIPER_URL:-http://piper:8200}
+      # Voice services run externally on GPU hosts over the tailnet. Lists are
+      # preference-ordered: omarchy (powerful desktop, when on) then sadida
+      # (always-on fallback). assistant-core picks the first that answers /health.
+      - WHISPER_URLS=${WHISPER_URLS:-http://omarchy.stegosaurus-panga.ts.net:8100,http://sadida.stegosaurus-panga.ts.net:8100}
+      - PIPER_URLS=${PIPER_URLS:-http://omarchy.stegosaurus-panga.ts.net:8200,http://sadida.stegosaurus-panga.ts.net:8200}
       # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).
       - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
@@ -183,44 +184,34 @@ services:
 
 
   # ############################ Voice services (Phase 2) ############################
-  # Piper (TTS) runs here on Ocra (CPU, fast enough).
+  # The WHOLE voice module (Whisper STT + Piper TTS) now runs EXTERNALLY on the
+  # GPU hosts over the tailnet, to offload Ocra and use the GPUs:
+  #   - omarchy (powerful desktop GPU, when on)  ← preferred
+  #   - sadida  (always-on GPU fallback)
+  # Deploy on each GPU host with voice-services/docker-compose.gpu.yaml.
+  # assistant-core reaches them via WHISPER_URLS / PIPER_URLS (preference-ordered).
   #
-  # Whisper (STT) now runs EXTERNALLY on Sadida's GPU (Docker + NVIDIA Container
-  # Toolkit), reachable over the tailnet. assistant-core points at it via
-  #   WHISPER_URL=http://sadida.stegosaurus-panga.ts.net:8100
-  # See voice-services/whisper/docker-compose.gpu.yaml (deployed on Sadida).
-  #
-  # The old Ocra CPU Whisper is kept commented as a fallback (uncomment + set
-  # WHISPER_URL=http://whisper:8100 to run STT locally on CPU again):
+  # Kept commented as CPU fallbacks on Ocra (uncomment + point WHISPER_URLS/
+  # PIPER_URLS back at whisper:8100 / piper:8200 to run locally again):
   #
   # whisper:
   #   image: whisper-stt:cpu
-  #   build:
-  #     context: ../voice-services/whisper
-  #     dockerfile: Dockerfile.cpu
+  #   build: { context: ../voice-services/whisper, dockerfile: Dockerfile.cpu }
   #   container_name: whisper_stt
   #   restart: always
+  #   environment: [ WHISPER_MODEL=${WHISPER_MODEL:-small}, WHISPER_DEVICE=cpu, WHISPER_COMPUTE=int8 ]
+  #   networks: [ n8n_network ]
+  #
+  # piper:
+  #   image: piper-tts:local
+  #   build: { context: ../voice-services/piper }
+  #   container_name: piper_tts
+  #   restart: always
   #   environment:
-  #     - WHISPER_MODEL=${WHISPER_MODEL:-small}
-  #     - WHISPER_DEVICE=cpu
-  #     - WHISPER_COMPUTE=int8
-  #   networks:
-  #     - n8n_network
-
-  piper:
-    image: piper-tts:local
-    build:
-      context: ../voice-services/piper
-    container_name: piper_tts
-    restart: always
-    environment:
-      - PIPER_VOICE=/voices/${PIPER_VOICE_FILE:-es_MX-ald-medium.onnx}
-      # For multi-speaker voices, pick a speaker index (blank = default).
-      - PIPER_SPEAKER=${PIPER_SPEAKER:-}
-    volumes:
-      - ../voice-services/voices:/voices:ro
-    networks:
-      - n8n_network
+  #     - PIPER_VOICE=/voices/${PIPER_VOICE_FILE:-es_MX-ald-medium.onnx}
+  #     - PIPER_SPEAKER=${PIPER_SPEAKER:-}
+  #   volumes: [ ../voice-services/voices:/voices:ro ]
+  #   networks: [ n8n_network ]
 
 volumes:
   postgres_data:
