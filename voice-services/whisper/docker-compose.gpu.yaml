@@ -1,0 +1,29 @@
+# Portable Whisper (STT) on any Docker host with an NVIDIA GPU.
+# Works on: an LXC with GPU passthrough + Docker, a GPU VM, or any Docker+GPU box.
+# Requires: NVIDIA driver on the host + NVIDIA Container Toolkit.
+#   Test the toolkit first:  docker run --rm --gpus all nvidia/cuda:12.2.2-base-ubuntu22.04 nvidia-smi
+#
+# Run:  docker compose -f docker-compose.gpu.yaml up -d --build
+# Reachable at  http://<host>:8100  (e.g. sadida.stegosaurus-panga.ts.net:8100)
+
+services:
+  whisper:
+    image: whisper-stt:gpu
+    build:
+      context: .
+      dockerfile: Dockerfile     # the CUDA/cuDNN GPU image
+    container_name: whisper_stt
+    restart: always
+    ports:
+      - "8100:8100"
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-small}   # base if VRAM is tight
+      - WHISPER_DEVICE=cuda
+      - WHISPER_COMPUTE=${WHISPER_COMPUTE:-float16}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
