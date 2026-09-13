@@ -123,32 +123,37 @@ app.get("/widgets/brain-graph", async () => {
 app.addContentTypeParser(/^audio\//, { parseAs: "buffer" }, (req, body, done) => done(null, body));
 app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (req, body, done) => done(null, body));
 
-// Pick the first host that answers /health within ~1.5s (preference order).
-// Falls back to the last host if none respond, so we still attempt the request.
-async function pickHost(urls) {
+// Try voice hosts in preference order: a quick /health gate skips dead hosts fast,
+// then run the op; if the op itself fails on a host, fall through to the next one.
+async function withVoiceHost(urls, op) {
+  let lastErr;
   for (const base of urls) {
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 1500);
     try {
-      const r = await fetch(`${base}/health`, { signal: ctl.signal });
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 1500);
+      const h = await fetch(`${base}/health`, { signal: ctl.signal });
       clearTimeout(t);
-      if (r.ok) return base;
-    } catch (_) {
-      clearTimeout(t);
-    }
+      if (!h.ok) { lastErr = new Error(`${base} health ${h.status}`); continue; }
+    } catch (e) { lastErr = e; continue; }
+    try {
+      return await op(base);
+    } catch (e) { lastErr = e; } // op failed on this host -> try the next
   }
-  return urls[urls.length - 1];
+  throw lastErr || new Error("no voice host available");
 }
 
 app.post("/voice/transcribe", async (req, reply) => {
+  const ct = req.headers["content-type"] || "audio/webm";
   try {
-    const ct = req.headers["content-type"] || "audio/webm";
-    const base = await pickHost(config.whisperUrls);
-    const fd = new FormData();
-    fd.append("file", new Blob([req.body], { type: ct }), "audio.webm");
-    const res = await fetch(`${base}/transcribe`, { method: "POST", body: fd });
-    const j = await res.json();
-    return { ok: j.ok !== false, text: j.text || "", language: j.language, host: base };
+    return await withVoiceHost(config.whisperUrls, async (base) => {
+      const fd = new FormData();
+      fd.append("file", new Blob([req.body], { type: ct }), "audio.webm");
+      const res = await fetch(`${base}/transcribe`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`${base} HTTP ${res.status}`);
+      const j = await res.json();
+      if (j.ok === false) throw new Error(`${base} STT ${j.error || "error"}`);
+      return { ok: true, text: j.text || "", language: j.language, host: base };
+    });
   } catch (err) {
     return reply.code(502).send({ ok: false, error: "STT failed: " + err.message });
   }
@@ -173,14 +178,15 @@ app.post("/voice/speak", async (req, reply) => {
   const text = forSpeech((req.body && req.body.text) || "");
   if (!text.trim()) return reply.code(400).send({ ok: false, error: "empty text" });
   try {
-    const base = await pickHost(config.piperUrls);
-    const res = await fetch(`${base}/speak`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text }),
+    const buf = await withVoiceHost(config.piperUrls, async (base) => {
+      const res = await fetch(`${base}/speak`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(`${base} HTTP ${res.status}`);
+      return Buffer.from(await res.arrayBuffer());
     });
-    if (!res.ok) return reply.code(502).send({ ok: false, error: "TTS failed" });
-    const buf = Buffer.from(await res.arrayBuffer());
     reply.header("Content-Type", "audio/wav");
     return reply.send(buf);
   } catch (err) {
