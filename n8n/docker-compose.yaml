@@ -207,6 +207,8 @@ services:
     restart: always
     environment:
       - PIPER_VOICE=/voices/${PIPER_VOICE_FILE:-es_MX-ald-medium.onnx}
+      # For multi-speaker voices, pick a speaker index (blank = default).
+      - PIPER_SPEAKER=${PIPER_SPEAKER:-}
     volumes:
       - ../voice-services/voices:/voices:ro
     networks:
