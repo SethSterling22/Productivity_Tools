@@ -138,8 +138,23 @@ app.post("/voice/transcribe", async (req, reply) => {
   }
 });
 
+// Strip Markdown / URLs / emojis so the TTS sounds natural (no "asterisco", no
+// reading links aloud).
+function forSpeech(s) {
+  return String(s || "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")            // [text](url) -> text
+    .replace(/https?:\/\/[^\s]+/g, "")                   // bare URLs
+    .replace(/```[\s\S]*?```/g, " ")                     // code fences
+    .replace(/[*_`~#>|]/g, "")                           // markdown symbols
+    .replace(/^[\s]*[-•]\s+/gm, "")                      // bullet markers
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu, "") // emojis/symbols
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
 app.post("/voice/speak", async (req, reply) => {
-  const text = (req.body && req.body.text) || "";
+  const text = forSpeech((req.body && req.body.text) || "");
   if (!text.trim()) return reply.code(400).send({ ok: false, error: "empty text" });
   try {
     const res = await fetch(`${config.piperUrl}/speak`, {

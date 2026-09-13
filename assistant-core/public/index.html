@@ -112,6 +112,7 @@
       <button class="mic" id="mic" title="Hablar (clic para grabar, clic para enviar)">MIC</button>
       <textarea id="input" rows="1" placeholder="Escribe a Rebeca…  (Enter para enviar)"></textarea>
       <button id="send">Enviar</button>
+      <button class="mic" id="stopVoice" title="Detener voz" style="display:none">■</button>
     </div>
   </section>
 
@@ -165,6 +166,7 @@ async function send(opts) {
   const input = $("input");
   const text = input.value.trim();
   if (!text) return;
+  stopSpeaking(); // sending something new cuts any playback
   input.value = ""; input.style.height = "auto";
   $("send").disabled = true;
   addMsg("user", text);
@@ -222,6 +224,7 @@ async function toggleMic() {
     return;
   }
   // start
+  stopSpeaking(); // starting a new recording cuts any playback
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch (e) { addMsg("assistant", "⚠ No pude acceder al micrófono: " + e.message); return; }
@@ -245,17 +248,27 @@ async function toggleMic() {
   mic.classList.add("rec"); mic.textContent = "● REC";
 }
 
+let currentAudio = null;
+function stopSpeaking() {
+  if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+  $("stopVoice").style.display = "none";
+}
 async function speakText(text) {
+  stopSpeaking(); // no overlap
   try {
     const r = await fetch(API + "/voice/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
     if (!r.ok) return;
     const buf = await r.blob();
     const audio = new Audio(URL.createObjectURL(buf));
-    audio.play().catch(() => {});
-  } catch (e) { /* ignore playback errors */ }
+    currentAudio = audio;
+    $("stopVoice").style.display = "";
+    audio.onended = () => { if (currentAudio === audio) { currentAudio = null; $("stopVoice").style.display = "none"; } };
+    audio.play().catch(() => { $("stopVoice").style.display = "none"; });
+  } catch (e) { $("stopVoice").style.display = "none"; }
 }
 
 $("mic").onclick = toggleMic;
+$("stopVoice").onclick = stopSpeaking;
 $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });

@@ -1,0 +1,20 @@
+[Unit]
+Description=Whisper STT (faster-whisper, GPU) for Rebeca
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/whisper-stt
+Environment=WHISPER_MODEL=small
+Environment=WHISPER_DEVICE=cuda
+Environment=WHISPER_COMPUTE=float16
+# ctranslate2 (faster-whisper) needs cuBLAS + cuDNN from the pip nvidia packages.
+Environment=LD_LIBRARY_PATH=/opt/whisper-stt/.venv/lib/python3.13/site-packages/nvidia/cublas/lib:/opt/whisper-stt/.venv/lib/python3.13/site-packages/nvidia/cudnn/lib
+ExecStart=/opt/whisper-stt/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8100
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target
