@@ -25,9 +25,20 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent }) {
   const tools = llmTools(ch);
   let finalText = "";
 
+  // Give the model the current date/time (LLMs don't know it) so it resolves
+  // "today"/"tomorrow" correctly and emits ISO 8601 with the right date/offset.
+  const nowStr = new Date().toLocaleString("es-PR", {
+    timeZone: "America/Puerto_Rico",
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const system =
+    `${config.systemPrompt}\n\nFecha y hora actual: ${nowStr} (America/Puerto_Rico, UTC-04:00). ` +
+    `Usa esto para resolver fechas relativas ("hoy", "mañana", "el viernes") y genera timestamps ISO 8601 con offset -04:00.`;
+
   for (let step = 0; step < config.maxAgentSteps; step++) {
     const { text, toolCalls } = await runModel({
-      system: config.systemPrompt,
+      system,
       messages,
       tools,
     });
