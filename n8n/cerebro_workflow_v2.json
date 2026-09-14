@@ -25,7 +25,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const msg = $input.first().json;\nconst text = msg.message?.text || msg.message?.caption || '';\nreturn [{\n  json: {\n    raw_text: text,\n    chat_id: msg.message?.chat?.id,\n    username: msg.message?.from?.username || 'unknown',\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const msg = $input.first().json;\nconst m = msg.message || {};\nconst voice = m.voice || m.audio || null;   // voice note or audio file\nreturn [{\n  json: {\n    raw_text: m.text || m.caption || '',\n    chat_id: m.chat?.id,\n    username: m.from?.username || 'unknown',\n    timestamp: new Date().toISOString(),\n    is_voice: !!voice,\n    voice_file_id: voice ? voice.file_id : null\n  }\n}];"
       },
       "id": "extract-msg",
       "name": "Extract message",
@@ -1001,6 +1001,84 @@
         1440,
         620
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "is-voice-cond",
+              "leftValue": "={{ $json.is_voice }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-voice-4a01-8b10-isvoiceif00001",
+      "name": "Is voice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        620,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.voice_file_id }}",
+        "download": true
+      },
+      "id": "a1b2c3d4-voice-4a02-8b10-getfile0000002",
+      "name": "Telegram — Get file",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        820,
+        160
+      ],
+      "credentials": {
+        "telegramApi": { "id": "YOUR_TELEGRAM_CRED", "name": "Telegram Bot" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4000/voice/transcribe",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [ { "name": "Content-Type", "value": "audio/ogg" } ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": { "timeout": 120000 }
+      },
+      "id": "a1b2c3d4-voice-4a03-8b10-transcribe0003",
+      "name": "Transcribe voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn the transcription into the normal message shape for the pipeline.\nconst r = $input.first().json;\nconst src = $('Extract message').first().json;\nconst text = (r && r.text) ? r.text.trim() : '';\nreturn [{ json: {\n  raw_text: text,\n  chat_id: src.chat_id,\n  username: src.username,\n  timestamp: src.timestamp,\n  is_voice: true,\n  voice_file_id: null\n} }];"
+      },
+      "id": "a1b2c3d4-voice-4a04-8b10-buildvoice00004",
+      "name": "Build voice text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        160
+      ]
     }
   ],
   "connections": {
@@ -1217,6 +1295,57 @@
       ]
     },
     "Extract message": {
+      "main": [
+        [
+          {
+            "node": "Is voice?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is voice?": {
+      "main": [
+        [
+          {
+            "node": "Telegram — Get file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fast route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram — Get file": {
+      "main": [
+        [
+          {
+            "node": "Transcribe voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe voice": {
+      "main": [
+        [
+          {
+            "node": "Build voice text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build voice text": {
       "main": [
         [
           {

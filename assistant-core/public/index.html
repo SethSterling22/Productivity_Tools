@@ -19,7 +19,7 @@
   body {
     background: var(--bg); color: var(--text);
     font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    display: grid; grid-template-columns: 1.4fr 1fr; grid-template-rows: 100vh;
+    display: grid; grid-template-columns: 1.4fr 1fr; grid-template-rows: 100dvh;
   }
   ::selection { background: var(--lime); color: #0d0d0d; }
 
@@ -98,6 +98,36 @@
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: #262626; }
   ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ── Panel toggle (drawer) ── */
+  #panelToggle {
+    display: none; margin-left: 12px; background: transparent; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 0; padding: 5px 10px; cursor: pointer; font-size: 15px; line-height: 1;
+  }
+  #panelToggle:hover { color: var(--text); border-color: var(--border-hi); }
+  #overlay { display: none; }
+
+  /* ── Mobile / narrow: chat full width, right panel becomes a slide-in drawer ── */
+  @media (max-width: 859px) {
+    body { grid-template-columns: 1fr; }
+    .chat { border-right: none; }
+    #panelToggle { display: inline-flex; align-items: center; margin-left: auto; }
+    .brand .status { display: none; }
+    .side {
+      position: fixed; top: 0; right: 0; height: 100dvh; width: min(340px, 86vw);
+      transform: translateX(100%); transition: transform .25s ease; z-index: 50;
+      border-left: 1px solid var(--border); box-shadow: -10px 0 30px rgba(0,0,0,.55);
+    }
+    .side.open { transform: translateX(0); }
+    #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 40; }
+    #overlay.show { display: block; }
+    .messages { padding: 14px; }
+    .msg { max-width: 92%; }
+    #graph { height: 200px; }
+    .composer { gap: 6px; padding: 10px; }
+    .composer button { padding: 0 12px; }
+    .composer textarea { padding: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -106,6 +136,7 @@
       <div class="logo">R</div>
       <h1>Rebeca</h1>
       <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">conectando</span></div>
+      <button id="panelToggle" title="Panel" aria-label="Panel">☰</button>
     </div>
     <div class="messages" id="messages"></div>
     <div class="composer">
@@ -116,7 +147,7 @@
     </div>
   </section>
 
-  <aside class="side">
+  <aside class="side" id="side">
     <div class="card">
       <h2>Próximos eventos</h2>
       <div class="body" id="calendar"><span class="empty">Cargando…</span></div>
@@ -131,6 +162,8 @@
       <div class="body"><div class="caps" id="caps"><span class="empty">Cargando…</span></div></div>
     </div>
   </aside>
+
+  <div id="overlay"></div>
 
 <script>
 const API = ""; // same origin as assistant-core
@@ -281,6 +314,11 @@ async function speakText(text) {
 
 $("mic").onclick = toggleMic;
 $("stopVoice").onclick = stopSpeaking;
+
+// Right panel as a slide-in drawer on mobile.
+const closeDrawer = () => { $("side").classList.remove("open"); $("overlay").classList.remove("show"); };
+$("panelToggle").onclick = () => { $("side").classList.toggle("open"); $("overlay").classList.toggle("show"); };
+$("overlay").onclick = closeDrawer;
 $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });
