@@ -79,6 +79,10 @@ services:
       - N8N_EDITOR_BASE_URL=https://ocra-n8n.stegosaurus-panga.ts.net/
       # Hermes gateway — reachable on localhost because they share the tailscale network
       - HERMES_URL=http://localhost:8080
+      # Shared token for internal calls to assistant-core (used via {{ $env.INTERNAL_TOKEN }}).
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-}
+      # Allow expressions to read process env (so {{ $env.INTERNAL_TOKEN }} works).
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
     volumes:
       - n8n_data:/home/node/.n8n
     depends_on:
@@ -176,6 +180,8 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-}
       - SESSION_SECRET=${SESSION_SECRET:-}
+      # Shared token so n8n/Telegram calls bypass the OAuth gate.
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

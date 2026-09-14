@@ -970,6 +970,10 @@
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_TOKEN }}"
             }
           ]
         },
@@ -1051,7 +1055,10 @@
         "url": "http://127.0.0.1:4000/voice/transcribe",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [ { "name": "Content-Type", "value": "audio/ogg" } ]
+          "parameters": [
+            { "name": "Content-Type", "value": "audio/ogg" },
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_TOKEN }}" }
+          ]
         },
         "sendBody": true,
         "contentType": "binaryData",

@@ -54,6 +54,9 @@ export const config = {
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
   // Secret used to sign session cookies. Set it in .env so sessions survive restarts.
   sessionSecret: process.env.SESSION_SECRET || ("dev-insecure-" + Math.random().toString(36).slice(2)),
+  // Shared secret for internal service-to-service calls (n8n -> assistant-core),
+  // so they bypass the Google OAuth gate. Sent as the X-Internal-Token header.
+  internalToken: process.env.INTERNAL_TOKEN || "",
 
   // ── Tool manifest ──────────────────────────────────────────────────────────
   manifestPath: process.env.TOOLS_MANIFEST || path.join(__dirname, "..", "tools.manifest.json"),

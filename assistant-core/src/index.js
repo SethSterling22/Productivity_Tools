@@ -35,6 +35,8 @@ function installAuthGate() {
     if (!authEnabled()) return;
     const p = req.url.split("?")[0];
     if (p === "/health" || p.startsWith("/auth/")) return;
+    // Internal service-to-service calls (n8n/Telegram) bypass OAuth via a shared token.
+    if (config.internalToken && req.headers["x-internal-token"] === config.internalToken) return;
     const raw = req.cookies?.[SESSION];
     const un = raw ? req.unsignCookie(raw) : { valid: false };
     if (un.valid && emailAllowed(un.value)) return;
