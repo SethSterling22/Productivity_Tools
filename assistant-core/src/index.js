@@ -18,6 +18,7 @@ import { config } from "./config.js";
 import { migrate, hasDb } from "./db.js";
 import { loadManifest, watchManifest, listTools, dispatch } from "./tools.js";
 import { runAgent } from "./agent.js";
+import * as memory from "./memory.js";
 import { authEnabled, loginUrl, exchangeCode, emailAllowed, secureCookies } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,6 +55,13 @@ app.get("/health", async () => ({
 }));
 
 app.get("/tools", async () => ({ tools: listTools() }));
+
+// Conversation history for a session (so the dashboard restores it on reload).
+app.get("/chat/history", async (req) => {
+  const sid = req.query && req.query.session_id;
+  if (!sid) return { messages: [] };
+  return { messages: await memory.getHistory(sid) };
+});
 
 // ── Google OAuth routes ────────────────────────────────────────────────────
 app.get("/auth/login", async (req, reply) => {

@@ -964,16 +964,14 @@
       "parameters": {
         "method": "POST",
         "url": "http://127.0.0.1:4000/chat",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Content-Type",
               "value": "application/json"
-            },
-            {
-              "name": "X-Internal-Token",
-              "value": "={{ $env.INTERNAL_TOKEN }}"
             }
           ]
         },
@@ -986,6 +984,9 @@
       },
       "id": "f5a6b7c8-0002-4c10-9d20-rebecahttp0002",
       "name": "Hermes → Rebeca",
+      "credentials": {
+        "httpHeaderAuth": { "name": "Rebeca Internal" }
+      },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -1053,11 +1054,12 @@
       "parameters": {
         "method": "POST",
         "url": "http://127.0.0.1:4000/voice/transcribe",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "audio/ogg" },
-            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_TOKEN }}" }
+            { "name": "Content-Type", "value": "audio/ogg" }
           ]
         },
         "sendBody": true,
@@ -1067,6 +1069,9 @@
       },
       "id": "a1b2c3d4-voice-4a03-8b10-transcribe0003",
       "name": "Transcribe voice",
+      "credentials": {
+        "httpHeaderAuth": { "name": "Rebeca Internal" }
+      },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [

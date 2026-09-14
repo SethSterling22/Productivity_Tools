@@ -191,11 +191,13 @@ that makes the assistant "adapt easily to any future n8n tool."
 - Wire Telegram's cerebro workflow to delegate "chat" intents to assistant-core so
   both channels share one brain.
 
-### Phase 2 — Voice
-- Deploy **Whisper** (faster-whisper) and **Piper** as HTTP services on the GPU node.
-- Dashboard **push-to-talk**: record mic → Whisper → chat → response → Piper playback.
-- Telegram: n8n downloads incoming voice notes → Whisper → text → assistant-core →
-  reply (optionally as a Piper-generated voice note).
+### Phase 2 — Voice  ✅ DONE (input side)
+- Whisper (faster-whisper, GPU via Docker) + Piper (TTS) deployed on GPU hosts
+  (omarchy preferred, sadida fallback); assistant-core load-balances via /health.
+- Dashboard **push-to-talk**: mic → Whisper → chat → Piper playback (Web Audio).
+- Telegram: n8n downloads voice notes → Whisper → text → Rebeca → text reply.
+- Internal token (X-Internal-Token) lets n8n bypass the dashboard OAuth gate.
+- Pending (optional): Telegram *voice* reply (Rebeca answers with a Piper voice note).
 
 ### Phase 3 — Jarvis polish
 - **Wake word** "Hey Jarvis" in the dashboard (openWakeWord), with push-to-talk

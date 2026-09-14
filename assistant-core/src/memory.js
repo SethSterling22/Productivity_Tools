@@ -23,6 +23,19 @@ export async function append(row) {
   mem.set(row.sessionId, arr);
 }
 
+// Full-ish history for display in the dashboard (oldest-first), capped larger.
+export async function getHistory(sessionId, limit = 200) {
+  let rows;
+  if (db.hasDb()) {
+    rows = await db.recentMessages(sessionId, limit);
+  } else {
+    rows = (mem.get(sessionId) || []).slice(-limit);
+  }
+  return rows
+    .filter((r) => (r.role === "user" || r.role === "assistant") && r.content)
+    .map((r) => ({ role: r.role, content: r.content }));
+}
+
 // Returns [{ role: "user"|"assistant", content }] oldest-first, capped.
 export async function getContext(sessionId) {
   let rows;

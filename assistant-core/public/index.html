@@ -105,6 +105,11 @@
     border: 1px solid var(--border); border-radius: 0; padding: 5px 10px; cursor: pointer; font-size: 15px; line-height: 1;
   }
   #panelToggle:hover { color: var(--text); border-color: var(--border-hi); }
+  #newChat {
+    margin-left: 12px; background: transparent; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 0; padding: 5px 10px; cursor: pointer; font-size: 15px; line-height: 1;
+  }
+  #newChat:hover { color: var(--lime); border-color: var(--border-hi); }
   #overlay { display: none; }
 
   /* ── Mobile / narrow: chat full width, right panel becomes a slide-in drawer ── */
@@ -136,6 +141,7 @@
       <div class="logo">R</div>
       <h1>Rebeca</h1>
       <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">conectando</span></div>
+      <button id="newChat" title="Nueva conversación" aria-label="Nueva conversación">＋</button>
       <button id="panelToggle" title="Panel" aria-label="Panel">☰</button>
     </div>
     <div class="messages" id="messages"></div>
@@ -167,7 +173,7 @@
 
 <script>
 const API = ""; // same origin as assistant-core
-const sessionId = "dashboard:" + (localStorage.getItem("rebeca_sid") || (() => {
+let sessionId = "dashboard:" + (localStorage.getItem("rebeca_sid") || (() => {
   const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
   localStorage.setItem("rebeca_sid", id); return id;
 })());
@@ -385,7 +391,30 @@ async function loadGraph() {
   }
 }
 
-addMsg("assistant", "Hola Sebastian 👋 Soy Rebeca. ¿En qué te ayudo hoy?");
+// Restore the conversation on reload (backend keeps it per session).
+async function loadHistory() {
+  try {
+    const r = await (await fetch(API + "/chat/history?session_id=" + encodeURIComponent(sessionId))).json();
+    const msgs = r.messages || [];
+    if (msgs.length) {
+      messages.innerHTML = "";
+      msgs.forEach((m) => addMsg(m.role === "user" ? "user" : "assistant", m.content));
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+function newChat() {
+  const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem("rebeca_sid", id);
+  sessionId = "dashboard:" + id;
+  stopSpeaking();
+  messages.innerHTML = "";
+  addMsg("assistant", "Nueva conversación. ¿En qué te ayudo, Sebastian?");
+}
+$("newChat").onclick = newChat;
+
+loadHistory().then((had) => { if (!had) addMsg("assistant", "Hola Sebastian 👋 Soy Rebeca. ¿En qué te ayudo hoy?"); });
 loadHealth(); loadCalendar(); loadCaps(); loadGraph();
 setInterval(loadHealth, 30000);
 setInterval(loadCalendar, 300000); // keep upcoming events fresh (every 5 min)
