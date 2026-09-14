@@ -115,7 +115,9 @@
     border: 1px solid var(--border); border-radius: 0; padding: 4px 9px; cursor: pointer; font-size: 14px; line-height: 1;
   }
   #convosToggle:hover { color: var(--text); border-color: var(--border-hi); }
-  #overlay { display: none; }
+  #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 40; }
+  #overlay.show { display: block; }
+  .convo-edit { flex: 1; background: var(--panel); border: 1px solid var(--lime); color: var(--text); font: inherit; font-size: 13px; padding: 2px 6px; border-radius: 0; outline: none; }
 
   /* ── Conversations drawer (left) ── */
   .convos {
@@ -152,8 +154,6 @@
       border-left: 1px solid var(--border); box-shadow: -10px 0 30px rgba(0,0,0,.55);
     }
     .side.open { transform: translateX(0); }
-    #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 40; }
-    #overlay.show { display: block; }
     .messages { padding: 14px; }
     .msg { max-width: 92%; }
     #graph { height: 200px; }
@@ -170,7 +170,6 @@
       <h1>Rebeca</h1>
       <button id="convosToggle" title="Conversaciones" aria-label="Conversaciones">🗂</button>
       <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">conectando</span></div>
-      <button id="newChat" title="Nueva conversación" aria-label="Nueva conversación">＋</button>
       <button id="panelToggle" title="Panel" aria-label="Panel">☰</button>
     </div>
     <div class="messages" id="messages"></div>
@@ -393,7 +392,11 @@ async function loadSessions() {
 }
 function renderSessions() {
   const q = ($("convosSearch").value || "").toLowerCase();
-  const items = allSessions.filter((s) => !q || (s.title || "").toLowerCase().includes(q));
+  const items = allSessions.filter((s) => {
+    if (!q) return true;
+    const full = s.updated_at ? new Date(s.updated_at).toLocaleDateString("es-PR", { timeZone: tzC, day: "numeric", month: "long", year: "numeric" }) : "";
+    return ((s.title || "") + " " + fmtDay(s.updated_at) + " " + full).toLowerCase().includes(q);
+  });
   const list = $("convosList");
   if (!items.length) { list.innerHTML = '<div class="empty" style="padding:12px 14px">Sin conversaciones.</div>'; return; }
   let html = "", lastDay = null;
@@ -408,14 +411,35 @@ function renderSessions() {
   }
   list.innerHTML = html;
   list.querySelectorAll(".convo").forEach((el) => el.onclick = (e) => { if (e.target.classList.contains("convo-rename")) return; switchSession(el.dataset.id); });
-  list.querySelectorAll(".convo-rename").forEach((el) => el.onclick = async (e) => {
+  list.querySelectorAll(".convo-rename").forEach((el) => el.onclick = (e) => {
     e.stopPropagation();
-    const s = allSessions.find((x) => x.id === el.dataset.id);
-    const name = prompt("Nombre de la conversación:", (s && s.title) || "");
-    if (name == null) return;
-    await fetch(API + "/chat/session/rename", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: el.dataset.id, title: name }) });
-    loadSessions();
+    startRename(el.closest(".convo"), el.dataset.id);
   });
+}
+function startRename(convo, id) {
+  if (!convo) return;
+  const titleSpan = convo.querySelector(".convo-title");
+  if (!titleSpan) return;
+  const current = titleSpan.textContent;
+  const input = document.createElement("input");
+  input.className = "convo-edit";
+  input.value = current;
+  titleSpan.replaceWith(input);
+  input.focus(); input.select();
+  let done = false;
+  const finish = async (commit) => {
+    if (done) return; done = true;
+    const name = (input.value || "").trim();
+    if (commit && name && name !== current) {
+      try {
+        await fetch(API + "/chat/session/rename", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: id, title: name }) });
+      } catch (e) {}
+    }
+    loadSessions();
+  };
+  input.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); finish(true); } else if (ev.key === "Escape") { finish(false); } };
+  input.onblur = () => finish(true);
+  input.onclick = (ev) => ev.stopPropagation();
 }
 async function switchSession(id) {
   sessionId = id;
@@ -519,8 +543,6 @@ function newChat() {
   messages.innerHTML = "";
   addMsg("assistant", "Nueva conversación. ¿En qué te ayudo, Sebastian?");
 }
-$("newChat").onclick = newChat;
-
 loadHistory().then((had) => { if (!had) addMsg("assistant", "Hola Sebastian 👋 Soy Rebeca. ¿En qué te ayudo hoy?"); });
 loadHealth(); loadCalendar(); loadCaps(); loadGraph();
 setInterval(loadHealth, 30000);
