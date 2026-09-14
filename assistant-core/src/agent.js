@@ -13,6 +13,8 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent }) {
 
   await memory.ensureSession(sessionId, ch);
   await memory.append({ sessionId, role: "user", content: userMessage });
+  // Default conversation name = first user message (only if not named yet).
+  await memory.setTitleIfEmpty(sessionId, userMessage.slice(0, 60));
 
   // Prior context (already includes the user message we just stored), as
   // simple role/content turns; the loop appends tool_use/tool_result blocks.

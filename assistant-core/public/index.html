@@ -110,7 +110,35 @@
     border: 1px solid var(--border); border-radius: 0; padding: 5px 10px; cursor: pointer; font-size: 15px; line-height: 1;
   }
   #newChat:hover { color: var(--lime); border-color: var(--border-hi); }
+  #convosToggle {
+    margin-left: 14px; background: transparent; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 0; padding: 4px 9px; cursor: pointer; font-size: 14px; line-height: 1;
+  }
+  #convosToggle:hover { color: var(--text); border-color: var(--border-hi); }
   #overlay { display: none; }
+
+  /* ── Conversations drawer (left) ── */
+  .convos {
+    position: fixed; top: 0; left: 0; height: 100dvh; width: min(320px, 86vw);
+    background: var(--panel2); border-right: 1px solid var(--border);
+    transform: translateX(-100%); transition: transform .25s ease; z-index: 55;
+    display: flex; flex-direction: column; box-shadow: 10px 0 30px rgba(0,0,0,.55);
+  }
+  .convos.open { transform: translateX(0); }
+  .convos-head { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid var(--border); }
+  .convos-head h2 { margin: 0; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-family: var(--mono); }
+  #convosNew { margin-left: auto; background: var(--lime); color: #0d0d0d; border: none; border-radius: 0; padding: 5px 10px; font-weight: 700; font-size: 11px; cursor: pointer; text-transform: uppercase; }
+  #convosSearch { margin: 10px 14px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 0; color: var(--text); font: inherit; outline: none; }
+  #convosSearch:focus { border-color: var(--lime); }
+  #convosList { overflow-y: auto; flex: 1; }
+  .convo-day { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 10px 14px 4px; }
+  .convo { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .convo:hover { background: rgba(188,191,86,.08); }
+  .convo.active { border-left: 2px solid var(--lime); }
+  .convo-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+  .convo-time { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .convo-rename { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 4px; }
+  .convo-rename:hover { color: var(--lime); }
 
   /* ── Mobile / narrow: chat full width, right panel becomes a slide-in drawer ── */
   @media (max-width: 859px) {
@@ -140,6 +168,7 @@
     <div class="brand">
       <div class="logo">R</div>
       <h1>Rebeca</h1>
+      <button id="convosToggle" title="Conversaciones" aria-label="Conversaciones">🗂</button>
       <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">conectando</span></div>
       <button id="newChat" title="Nueva conversación" aria-label="Nueva conversación">＋</button>
       <button id="panelToggle" title="Panel" aria-label="Panel">☰</button>
@@ -167,6 +196,15 @@
       <h2>Capacidades</h2>
       <div class="body"><div class="caps" id="caps"><span class="empty">Cargando…</span></div></div>
     </div>
+  </aside>
+
+  <aside class="convos" id="convos">
+    <div class="convos-head">
+      <h2>Conversaciones</h2>
+      <button id="convosNew" title="Nueva">＋ Nueva</button>
+    </div>
+    <input id="convosSearch" placeholder="Buscar…" autocomplete="off" />
+    <div id="convosList"></div>
   </aside>
 
   <div id="overlay"></div>
@@ -321,10 +359,79 @@ async function speakText(text) {
 $("mic").onclick = toggleMic;
 $("stopVoice").onclick = stopSpeaking;
 
-// Right panel as a slide-in drawer on mobile.
-const closeDrawer = () => { $("side").classList.remove("open"); $("overlay").classList.remove("show"); };
-$("panelToggle").onclick = () => { $("side").classList.toggle("open"); $("overlay").classList.toggle("show"); };
-$("overlay").onclick = closeDrawer;
+// Drawers: right panel (widgets) and left panel (conversations).
+function closeAllDrawers() {
+  $("side").classList.remove("open");
+  $("convos").classList.remove("open");
+  $("overlay").classList.remove("show");
+}
+$("panelToggle").onclick = () => {
+  const willOpen = !$("side").classList.contains("open");
+  $("convos").classList.remove("open");
+  $("side").classList.toggle("open", willOpen);
+  $("overlay").classList.toggle("show", willOpen);
+};
+$("overlay").onclick = closeAllDrawers;
+
+// ── Conversations switcher ──
+const tzC = "America/Puerto_Rico";
+let allSessions = [];
+function fmtDay(iso) {
+  if (!iso) return "Sin fecha";
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: tzC });
+  const yest = new Date(Date.now() - 86400000).toLocaleDateString("en-CA", { timeZone: tzC });
+  const dd = new Date(iso).toLocaleDateString("en-CA", { timeZone: tzC });
+  if (dd === today) return "Hoy";
+  if (dd === yest) return "Ayer";
+  try { return new Date(iso).toLocaleDateString("es-PR", { timeZone: tzC, day: "numeric", month: "short", year: "numeric" }); } catch { return dd; }
+}
+function fmtTimeC(iso) { try { return new Date(iso).toLocaleTimeString("es-PR", { timeZone: tzC, hour: "2-digit", minute: "2-digit" }); } catch { return ""; } }
+async function loadSessions() {
+  try { const r = await (await fetch(API + "/chat/sessions?channel=dashboard")).json(); allSessions = r.sessions || []; }
+  catch { allSessions = []; }
+  renderSessions();
+}
+function renderSessions() {
+  const q = ($("convosSearch").value || "").toLowerCase();
+  const items = allSessions.filter((s) => !q || (s.title || "").toLowerCase().includes(q));
+  const list = $("convosList");
+  if (!items.length) { list.innerHTML = '<div class="empty" style="padding:12px 14px">Sin conversaciones.</div>'; return; }
+  let html = "", lastDay = null;
+  for (const s of items) {
+    const day = fmtDay(s.updated_at);
+    if (day !== lastDay) { html += '<div class="convo-day">' + esc(day) + '</div>'; lastDay = day; }
+    const active = s.id === sessionId ? " active" : "";
+    html += '<div class="convo' + active + '" data-id="' + esc(s.id) + '">' +
+      '<span class="convo-title">' + esc(s.title || "Conversación") + '</span>' +
+      '<span class="convo-time">' + esc(fmtTimeC(s.updated_at)) + '</span>' +
+      '<button class="convo-rename" data-id="' + esc(s.id) + '" title="Renombrar">✎</button></div>';
+  }
+  list.innerHTML = html;
+  list.querySelectorAll(".convo").forEach((el) => el.onclick = (e) => { if (e.target.classList.contains("convo-rename")) return; switchSession(el.dataset.id); });
+  list.querySelectorAll(".convo-rename").forEach((el) => el.onclick = async (e) => {
+    e.stopPropagation();
+    const s = allSessions.find((x) => x.id === el.dataset.id);
+    const name = prompt("Nombre de la conversación:", (s && s.title) || "");
+    if (name == null) return;
+    await fetch(API + "/chat/session/rename", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: el.dataset.id, title: name }) });
+    loadSessions();
+  });
+}
+async function switchSession(id) {
+  sessionId = id;
+  localStorage.setItem("rebeca_sid", id.replace(/^dashboard:/, ""));
+  await loadHistory();
+  closeAllDrawers();
+}
+$("convosToggle").onclick = () => {
+  const willOpen = !$("convos").classList.contains("open");
+  $("side").classList.remove("open");
+  $("convos").classList.toggle("open", willOpen);
+  $("overlay").classList.toggle("show", willOpen);
+  if (willOpen) loadSessions();
+};
+$("convosSearch").oninput = renderSessions;
+$("convosNew").onclick = () => { newChat(); closeAllDrawers(); };
 $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });

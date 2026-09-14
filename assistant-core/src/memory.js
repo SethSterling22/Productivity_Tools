@@ -23,6 +23,20 @@ export async function append(row) {
   mem.set(row.sessionId, arr);
 }
 
+// Session list / titles (DB-backed; in-memory fallback is minimal).
+export async function listSessions(channel, limit = 100) {
+  if (db.hasDb()) return db.listSessions(channel, limit);
+  return [...mem.keys()]
+    .filter((id) => id.startsWith(channel + ":"))
+    .map((id) => ({ id, title: null, created_at: null, updated_at: null }));
+}
+export async function setTitleIfEmpty(id, title) {
+  if (db.hasDb()) return db.setTitleIfEmpty(id, title);
+}
+export async function renameSession(id, title) {
+  if (db.hasDb()) return db.renameSession(id, title);
+}
+
 // Full-ish history for display in the dashboard (oldest-first), capped larger.
 export async function getHistory(sessionId, limit = 200) {
   let rows;

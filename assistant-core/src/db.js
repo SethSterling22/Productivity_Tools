@@ -88,6 +88,28 @@ export async function insertMessage(row) {
   );
 }
 
+// List sessions for a channel (most recently active first).
+export async function listSessions(channel, limit = 100) {
+  const { rows } = await getPool().query(
+    `SELECT id, title, created_at, updated_at FROM chat_session
+      WHERE channel = $1 ORDER BY updated_at DESC LIMIT $2`,
+    [channel, limit]
+  );
+  return rows;
+}
+
+// Set a title only if the session doesn't have one yet (auto-name from 1st msg).
+export async function setTitleIfEmpty(id, title) {
+  await getPool().query(
+    `UPDATE chat_session SET title = $2 WHERE id = $1 AND (title IS NULL OR title = '')`,
+    [id, title]
+  );
+}
+
+export async function renameSession(id, title) {
+  await getPool().query(`UPDATE chat_session SET title = $2 WHERE id = $1`, [id, title]);
+}
+
 // Most recent messages for a session, oldest-first, capped to `limit`.
 export async function recentMessages(sessionId, limit) {
   const { rows } = await getPool().query(

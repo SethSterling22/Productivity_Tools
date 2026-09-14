@@ -63,6 +63,20 @@ app.get("/chat/history", async (req) => {
   return { messages: await memory.getHistory(sid) };
 });
 
+// List recent conversations (for the dashboard switcher).
+app.get("/chat/sessions", async (req) => {
+  const channel = (req.query && req.query.channel) || "dashboard";
+  return { sessions: await memory.listSessions(channel, 100) };
+});
+
+// Rename a conversation.
+app.post("/chat/session/rename", async (req) => {
+  const { session_id, title } = req.body || {};
+  if (!session_id) return { ok: false, error: "session_id required" };
+  await memory.renameSession(session_id, String(title || "").slice(0, 120));
+  return { ok: true };
+});
+
 // ── Google OAuth routes ────────────────────────────────────────────────────
 app.get("/auth/login", async (req, reply) => {
   if (!authEnabled()) return reply.redirect("/");
