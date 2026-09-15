@@ -1,0 +1,33 @@
+{
+  "name": "tool · TEMPLATE (rename me)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tool/my_tool",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "tmpl-webhook-0001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "tool-my-tool"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input from assistant-core arrives as JSON in the webhook body.\n// Do your work here (call an API node instead of Code for real integrations),\n// then return a small JSON result the LLM can read. Always include `ok`.\nconst d = $json.body || $json || {};\ntry {\n  // ...do something with d.<your fields>...\n  return [{ json: { ok: true, echo: d } }];\n} catch (e) {\n  return [{ json: { ok: false, error: e.message } }];\n}"
+      },
+      "id": "tmpl-shape-0002",
+      "name": "Do work + shape response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Do work + shape response", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

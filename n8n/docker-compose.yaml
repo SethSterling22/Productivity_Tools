@@ -191,6 +191,9 @@ services:
       # Read-only access to the git-backed brain vault (in the hermes volume) so
       # the RAG indexer can read the notes at /hermes-workspace/brain.
       - hermes_workspace:/hermes-workspace:ro
+      # Live tool manifest: edit + git pull to add tools; assistant-core hot-reloads
+      # it (no rebuild needed for manifest-only changes).
+      - ../assistant-core/tools.manifest.json:/app/tools.manifest.json:ro
     depends_on:
       postgres:
         condition: service_healthy

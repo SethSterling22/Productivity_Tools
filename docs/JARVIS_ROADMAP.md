@@ -210,10 +210,15 @@ that makes the assistant "adapt easily to any future n8n tool."
   indexNoteByPath). The /note Telegram slash-command path still needs a manual
   /brain/reindex (or a future hook).
 
-### Phase 4 — Extensibility hardening
-- Document and templatize the "add a tool" flow (sub-workflow template + manifest
-  entry + optional dashboard icon).
-- Optional: auto-generate the manifest from tagged n8n sub-workflows.
+### Phase 4 — Extensibility hardening  ✅ DONE
+- ✅ "Add a tool" guide: `docs/ADDING_A_TOOL.md` (n8n_webhook / hermes_tool /
+  builtin / http recipes, testing, conventions).
+- ✅ Reusable n8n sub-workflow template: `n8n/tools/_template.workflow.json`.
+- ✅ Manifest bind-mounted + hot-reloaded → add a tool by editing the manifest +
+  `git pull`, no rebuild for manifest-only changes.
+- ⬜ Optional cleanup: delete the now-orphaned "Hermes — Classify intent" node in
+  the cerebro workflow (free-text goes to Rebeca now).
+- ⬜ Optional: auto-generate the manifest from tagged n8n sub-workflows.
 
 ---
 
