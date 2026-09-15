@@ -551,6 +551,30 @@
       }
     },
     {
+      "id": "index-note-rag-0001",
+      "name": "Index note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2040, 520],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4000/brain/index-note",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [ { "name": "Content-Type", "value": "application/json" } ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ path: (($json.result || '').match(/Note saved:\\s*(\\S+\\.md)/) || [])[1] || '' }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "credentials": {
+        "httpHeaderAuth": { "name": "Rebeca Internal" }
+      }
+    },
+    {
       "id": "build-task",
       "name": "Build task",
       "type": "n8n-nodes-base.code",
@@ -1479,6 +1503,11 @@
         [
           {
             "node": "Parse note",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Index note",
             "type": "main",
             "index": 0
           }

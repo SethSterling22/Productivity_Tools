@@ -66,6 +66,17 @@ app.post("/brain/reindex", async (req, reply) => {
   }
 });
 
+// Incrementally index a single note (used by the Telegram /note flow).
+app.post("/brain/index-note", async (req, reply) => {
+  const p = req.body && req.body.path;
+  if (!p) return reply.code(400).send({ ok: false, error: "path required" });
+  try {
+    return await rag.indexNoteByPath(p);
+  } catch (err) {
+    return reply.code(500).send({ ok: false, error: err.message });
+  }
+});
+
 // Conversation history for a session (so the dashboard restores it on reload).
 app.get("/chat/history", async (req) => {
   const sid = req.query && req.query.session_id;
