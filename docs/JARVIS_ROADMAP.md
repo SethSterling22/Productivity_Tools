@@ -199,11 +199,16 @@ that makes the assistant "adapt easily to any future n8n tool."
 - Internal token (X-Internal-Token) lets n8n bypass the dashboard OAuth gate.
 - Pending (optional): Telegram *voice* reply (Rebeca answers with a Piper voice note).
 
-### Phase 3 — Jarvis polish
-- **Wake word** "Hey Jarvis" in the dashboard (openWakeWord), with push-to-talk
-  fallback.
-- Continuous conversation, barge-in, streaming TTS.
-- **Long-term memory / RAG** over the brain (embeddings + vector search).
+### Phase 3 — Jarvis polish  (partially DONE)
+- ✅ **Long-term memory / RAG** over the brain: Qdrant + Ollama embeddings
+  (nomic-embed-text), `search_brain_semantic` builtin tool, `POST /brain/reindex`.
+- ✅ **Dashboard sessions**: history restored on reload, conversation switcher
+  (list by date, search, inline rename), per-session memory in Postgres.
+- ⬜ **Wake word** "Hey Rebeca" (skipped for now; push-to-talk works).
+- ⬜ Continuous conversation, barge-in, streaming TTS.
+- ✅ Auto-index a note into Qdrant when Rebeca saves it (save_note → incremental
+  indexNoteByPath). The /note Telegram slash-command path still needs a manual
+  /brain/reindex (or a future hook).
 
 ### Phase 4 — Extensibility hardening
 - Document and templatize the "add a tool" flow (sub-workflow template + manifest

@@ -77,6 +77,12 @@ export async function dispatch(name, input) {
     let body;
     try { body = JSON.parse(text); } catch { body = { raw: text }; }
     if (!res.ok) return { ok: false, error: `Tool ${name} HTTP ${res.status}`, body };
+    // Auto-index a saved note into Qdrant (fire-and-forget) so semantic search
+    // stays fresh without a manual /brain/reindex.
+    if (name === "save_note" && body && body.ok !== false) {
+      const m = /Note saved:\s*(\S+\.md)/.exec(body.result || "");
+      if (m) rag.indexNoteByPath(m[1]).catch(() => {});
+    }
     return body;
   } catch (err) {
     return { ok: false, error: `Tool ${name} failed: ${err.message}` };

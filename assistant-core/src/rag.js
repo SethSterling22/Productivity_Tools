@@ -101,6 +101,50 @@ export async function reindex() {
 // Alias (index.js route calls reindexBrain).
 export const reindexBrain = reindex;
 
+// Create the collection if it doesn't exist yet.
+async function ensureCollection() {
+  try { await qdrant("GET", `/collections/${COLLECTION}`); return; }
+  catch { await qdrant("PUT", `/collections/${COLLECTION}`, { vectors: { size: config.embedDim, distance: "Cosine" } }); }
+}
+
+// Build points (title/url/chunks) for one note's content.
+function notePoints(relPath, content) {
+  const base = relPath.replace(/\.md$/, "").split("/").pop();
+  let title = base;
+  const fm = content.match(/^---[\s\S]*?\ntitle:\s*"?([^"\n]+)"?/);
+  if (fm) title = fm[1].trim();
+  const body = content.replace(/^---[\s\S]*?---\n/, "");
+  const webBase = (config.brainWebUrl || "").replace(/\/+$/, "");
+  const url = webBase ? `${webBase}/blob/${config.brainBranch}/${relPath.split("/").map(encodeURIComponent).join("/")}` : "";
+  return chunkText(body).map((text, i) => ({ key: relPath + "#" + i, title, url, text }));
+}
+
+// Incrementally (re)index a single note by its vault-relative path.
+export async function indexNoteByPath(relPath) {
+  const clean = String(relPath || "").replace(/^\/+/, "");
+  if (!clean.endsWith(".md")) return { ok: false, error: "not a .md path" };
+  let content = "";
+  try { content = await fs.readFile(path.join(config.brainPath, clean), "utf8"); }
+  catch (e) { return { ok: false, error: "read failed: " + e.message }; }
+
+  await ensureCollection();
+  // Drop old points for this note (so edits/deletes don't leave stale chunks).
+  try {
+    await qdrant("POST", `/collections/${COLLECTION}/points/delete`, {
+      filter: { must: [{ key: "path", match: { value: clean } }] },
+    });
+  } catch {}
+
+  const points = [];
+  for (const p of notePoints(clean, content)) {
+    let vector;
+    try { vector = await embed(p.text); } catch { continue; }
+    points.push({ id: uuidFrom(p.key), vector, payload: { path: clean, title: p.title, url: p.url, text: p.text } });
+  }
+  if (points.length) await qdrant("PUT", `/collections/${COLLECTION}/points`, { points });
+  return { ok: true, path: clean, chunks: points.length };
+}
+
 // Semantic search. Returns { ok, results:[{title,url,text,score}] }.
 export async function searchBrain({ query, limit } = {}) {
   const q = (query || "").trim();
