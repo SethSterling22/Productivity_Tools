@@ -98,6 +98,9 @@ export async function reindex() {
   return { ok: true, notes: notes.length, chunks };
 }
 
+// Alias (index.js route calls reindexBrain).
+export const reindexBrain = reindex;
+
 // Semantic search. Returns { ok, results:[{title,url,text,score}] }.
 export async function searchBrain({ query, limit } = {}) {
   const q = (query || "").trim();

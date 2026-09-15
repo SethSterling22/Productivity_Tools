@@ -57,15 +57,6 @@ app.get("/health", async () => ({
 
 app.get("/tools", async () => ({ tools: listTools() }));
 
-// (Re)build the second-brain vector index. Run after adding/editing notes.
-app.post("/brain/reindex", async (req, reply) => {
-  try {
-    return await rag.reindex();
-  } catch (err) {
-    return reply.code(500).send({ ok: false, error: err.message });
-  }
-});
-
 // Re-index the second brain into Qdrant (run after adding/changing notes).
 app.post("/brain/reindex", async (req, reply) => {
   try {
