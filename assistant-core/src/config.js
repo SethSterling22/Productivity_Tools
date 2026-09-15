@@ -32,6 +32,20 @@ export const config = {
   hermesUrl: process.env.HERMES_URL || "http://127.0.0.1:8080",
   n8nWebhookBase: process.env.N8N_WEBHOOK_BASE || "http://127.0.0.1:5678/webhook",
 
+  // ── RAG / long-term memory (Qdrant + Ollama embeddings over the brain) ──────
+  qdrantUrl: process.env.QDRANT_URL || "http://qdrant:6333",
+  embedModel: process.env.EMBED_MODEL || "nomic-embed-text",
+  brainPath: process.env.BRAIN_PATH || "/hermes/brain",
+
+  // ── RAG (long-term memory over the second brain) ───────────────────────────
+  qdrantUrl: process.env.QDRANT_URL || "http://qdrant:6333",
+  embedModel: process.env.EMBED_MODEL || "nomic-embed-text",
+  embedDim: Number(process.env.EMBED_DIM || 768),
+  brainPath: process.env.BRAIN_PATH || "/hermes-workspace/brain",
+  brainWebUrl: process.env.BRAIN_WEB_URL || "https://github.com/SethSterling22/Brain",
+  brainBranch: process.env.BRAIN_BRANCH || "main",
+  ragCollection: process.env.RAG_COLLECTION || "brain",
+
   // ── Voice services (STT/TTS) ───────────────────────────────────────────────
   // Preference-ordered lists: assistant-core uses the first host that answers a
   // quick /health (e.g. omarchy when your desktop is on, else sadida).

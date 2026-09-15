@@ -174,6 +174,11 @@ services:
       # (always-on fallback). assistant-core picks the first that answers /health.
       - WHISPER_URLS=${WHISPER_URLS:-http://omarchy.stegosaurus-panga.ts.net:8100,http://sadida.stegosaurus-panga.ts.net:8100}
       - PIPER_URLS=${PIPER_URLS:-http://omarchy.stegosaurus-panga.ts.net:8200,http://sadida.stegosaurus-panga.ts.net:8200}
+      # RAG (long-term memory): Qdrant + Ollama embeddings over the brain vault.
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text}
+      - EMBED_DIM=${EMBED_DIM:-768}
+      - BRAIN_WEB_URL=${HERMES_BRAIN_WEB_URL:-https://github.com/SethSterling22/Brain}
       # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).
       - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
@@ -182,11 +187,26 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-}
       # Shared token so n8n/Telegram calls bypass the OAuth gate.
       - INTERNAL_TOKEN=${INTERNAL_TOKEN:-}
+    volumes:
+      # Read-only access to the git-backed brain vault (in the hermes volume) so
+      # the RAG indexer can read the notes at /hermes-workspace/brain.
+      - hermes_workspace:/hermes-workspace:ro
     depends_on:
       postgres:
         condition: service_healthy
       tailscale:
         condition: service_started
+
+
+  # ############################ Qdrant (vector DB for RAG) ############################
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: always
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - n8n_network
 
 
   # ############################ Voice services (Phase 2) ############################
@@ -227,6 +247,8 @@ volumes:
   tailscale_state:
     driver: local
   hermes_workspace:
+    driver: local
+  qdrant_data:
     driver: local
 
 networks:

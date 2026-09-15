@@ -7,6 +7,12 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { config } from "./config.js";
+import * as rag from "./rag.js";
+
+// Tools implemented in-process (no external HTTP hop).
+const BUILTINS = {
+  search_brain_semantic: (input) => rag.searchBrain(input || {}),
+};
 
 let manifest = { version: 0, tools: [] };
 let byName = new Map();
@@ -46,6 +52,15 @@ export async function dispatch(name, input) {
   if (!tool) return { ok: false, error: `Unknown tool: ${name}` };
 
   const ep = tool.endpoint || {};
+
+  // In-process builtins (e.g. semantic brain search) run without an HTTP hop.
+  if (ep.type === "builtin") {
+    const fn = BUILTINS[ep.name || name];
+    if (!fn) return { ok: false, error: `Unknown builtin: ${ep.name || name}` };
+    try { return await fn(input); }
+    catch (err) { return { ok: false, error: `${name} failed: ${err.message}` }; }
+  }
+
   let url;
   if (ep.type === "hermes_tool") url = config.hermesUrl + ep.path;
   else if (ep.type === "n8n_webhook") url = config.n8nWebhookBase + ep.path;

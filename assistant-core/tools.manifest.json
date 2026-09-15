@@ -71,6 +71,21 @@
       "endpoint": { "type": "hermes_tool", "path": "/tool/brain_list" },
       "channels": ["dashboard", "telegram"],
       "icon": "folder-tree"
+    },
+    {
+      "name": "search_brain_semantic",
+      "description": "Search the user's second brain by meaning (semantic/RAG) to answer questions grounded in their own notes, e.g. 'what did I decide about the Ocra ingress?'. Returns the most relevant note excerpts with links. Prefer this over search_brain when answering a question from the notes.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "What to look for, in natural language." },
+          "limit": { "type": "integer", "description": "Max results (default 5)." }
+        },
+        "required": ["query"]
+      },
+      "endpoint": { "type": "builtin", "name": "search_brain_semantic" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "search"
     }
   ]
 }
