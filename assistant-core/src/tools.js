@@ -8,10 +8,12 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { config } from "./config.js";
 import * as rag from "./rag.js";
+import { webSearch } from "./websearch.js";
 
 // Tools implemented in-process (no external HTTP hop).
 const BUILTINS = {
   search_brain_semantic: (input) => rag.searchBrain(input || {}),
+  web_search: (input) => webSearch(input || {}),
 };
 
 let manifest = { version: 0, tools: [] };

@@ -32,6 +32,10 @@ export const config = {
   hermesUrl: process.env.HERMES_URL || "http://127.0.0.1:8080",
   n8nWebhookBase: process.env.N8N_WEBHOOK_BASE || "http://127.0.0.1:5678/webhook",
 
+  // Self-hosted SearXNG (metasearch) for the web_search builtin. Reached by
+  // Docker DNS on n8n_network, like Qdrant. No API key needed.
+  searxngUrl: process.env.SEARXNG_URL || "http://searxng:8080",
+
   // ── RAG / long-term memory (Qdrant + Ollama embeddings over the brain) ──────
   qdrantUrl: process.env.QDRANT_URL || "http://qdrant:6333",
   embedModel: process.env.EMBED_MODEL || "nomic-embed-text",

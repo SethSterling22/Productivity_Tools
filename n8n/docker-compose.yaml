@@ -179,6 +179,8 @@ services:
       - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text}
       - EMBED_DIM=${EMBED_DIM:-768}
       - BRAIN_WEB_URL=${HERMES_BRAIN_WEB_URL:-https://github.com/SethSterling22/Brain}
+      # Web search (SearXNG) for the web_search builtin (current events, weather...).
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
       # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).
       - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
@@ -208,6 +210,26 @@ services:
     restart: always
     volumes:
       - qdrant_data:/qdrant/storage
+    networks:
+      - n8n_network
+
+
+  # ############################ SearXNG (web search for Rebeca) ############################
+  # Privacy-respecting metasearch. assistant-core's web_search builtin hits its
+  # JSON API at http://searxng:8080 (Docker DNS on n8n_network, like Qdrant).
+  # No host port published: it's reachable only from inside the Docker network.
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: always
+    environment:
+      # Public base URL (used internally; JSON works without a real hostname).
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      # Overrides server.secret_key from settings.yml. Set in .env.
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-change-me-in-.env}
+    volumes:
+      # Our overrides (enables the JSON format the tool needs).
+      - ../searxng/settings.yml:/etc/searxng/settings.yml:ro
     networks:
       - n8n_network
 

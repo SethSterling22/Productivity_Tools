@@ -1,0 +1,26 @@
+# SearXNG settings for Rebeca's web_search tool.
+# Inherits SearXNG's built-in defaults and only overrides what we need.
+# Docs: https://docs.searxng.org/admin/settings/
+use_default_settings: true
+
+server:
+  # secret_key is overridden at runtime by the SEARXNG_SECRET env var (see compose).
+  secret_key: "change-me-in-.env"
+  # We only reach it from inside the Docker network, so the bot limiter (which
+  # would 429 our JSON calls) is off. Keep it off only because it's not exposed.
+  limiter: false
+  image_proxy: true
+
+search:
+  # Enable the JSON API (disabled by default). This is what assistant-core calls.
+  formats:
+    - html
+    - json
+  # Default UI language; the tool still overrides per-query.
+  default_lang: "es"
+
+engines:
+  # Trim a few engines that are slow / frequently rate-limit, keeping the fast,
+  # reliable ones. Everything else stays at SearXNG defaults.
+  - name: wikipedia
+    disabled: false
