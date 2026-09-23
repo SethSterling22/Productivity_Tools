@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover keeps content edge-to-edge on the round display -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0d">
+<title>Rebeca · Watch</title>
+<style>
+  :root{
+    --bg:#0d0d0d; --fg:#ececec; --muted:#8a8a80;
+    --olive:#bcbf56; --coral:#f27e63; --panel:#161613;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  /* Everything lives inside an inscribed square so nothing is clipped by the
+     round bezel. On a circular watch the corners are dead space. */
+  .wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:space-between;padding:8% 12%;text-align:center}
+  .top{display:flex;align-items:center;gap:6px;font-size:3.4vmin;color:var(--muted);
+    letter-spacing:.5px}
+  .dot{width:2.2vmin;height:2.2vmin;border-radius:50%;background:var(--muted);flex:none}
+  .dot.listening{background:var(--coral);animation:pulse 1s infinite}
+  .dot.thinking{background:var(--olive);animation:pulse .7s infinite}
+  .dot.speaking{background:#5fd08a}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  /* Reply text: scrollable, capped so the mic stays reachable. */
+  .reply{flex:1;width:100%;display:flex;align-items:center;justify-content:center;
+    overflow-y:auto;font-size:4.2vmin;line-height:1.3;padding:2vmin 0;
+    scrollbar-width:none}
+  .reply::-webkit-scrollbar{display:none}
+  .reply .hint{color:var(--muted)}
+
+  /* Central mic button. */
+  .mic{width:26vmin;height:26vmin;border-radius:50%;border:0.8vmin solid var(--olive);
+    background:var(--panel);color:var(--olive);font-size:8vmin;line-height:1;
+    display:flex;align-items:center;justify-content:center;flex:none;
+    transition:transform .1s ease;user-select:none}
+  .mic:active{transform:scale(.94)}
+  .mic.rec{border-color:var(--coral);color:var(--coral);animation:ring 1s infinite}
+  .mic.busy{border-color:var(--olive);color:var(--muted)}
+  .mic.disabled{opacity:.4}
+  @keyframes ring{0%,100%{box-shadow:0 0 0 0 rgba(242,126,99,.5)}
+    50%{box-shadow:0 0 0 2.5vmin rgba(242,126,99,0)}}
+
+  /* Quick actions: single horizontal scroll row (thumb-swipe on the watch). */
+  .chips{display:flex;gap:2vmin;width:100%;overflow-x:auto;padding:1vmin 0;
+    scrollbar-width:none;scroll-snap-type:x mandatory}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;scroll-snap-align:center;background:var(--panel);color:var(--fg);
+    border:0.4vmin solid #2a2a24;border-radius:6vmin;padding:2vmin 4vmin;
+    font-size:3.4vmin;white-space:nowrap}
+  .chip:active{border-color:var(--olive)}
+  .chip.stop{border-color:var(--coral);color:var(--coral);display:none}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top"><span class="dot" id="dot"></span><span id="status">Rebeca</span></div>
+    <div class="reply" id="reply"><span class="hint">Toca el micrófono y habla</span></div>
+    <div class="mic" id="mic">🎙</div>
+    <div class="chips" id="chips">
+      <button class="chip stop" id="stop">⏹ Parar</button>
+      <button class="chip" data-say="¿Qué tengo hoy en la agenda?">📅 Agenda</button>
+      <button class="chip" data-say="¿Qué clima hace hoy en San Juan?">🌤 Clima</button>
+      <button class="chip" data-say="Léeme un resumen de mis últimas notas.">🗒 Notas</button>
+      <button class="chip" data-repeat="1">🔁 Repetir</button>
+      <button class="chip" data-new="1">✨ Nuevo</button>
+    </div>
+  </div>
+
+<script>
+const API = "";                         // same origin
+const $ = (id) => document.getElementById(id);
+const dot = $("dot"), statusEl = $("status"), replyEl = $("reply");
+
+// Persist a watch-only conversation so it survives reloads.
+let sessionId = localStorage.getItem("rebeca_watch_sid");
+if (!sessionId) { sessionId = "watch-" + Math.random().toString(36).slice(2); localStorage.setItem("rebeca_watch_sid", sessionId); }
+let lastReply = "";
+
+function setStatus(state, label){
+  dot.className = "dot" + (state ? " " + state : "");
+  statusEl.textContent = label || "Rebeca";
+}
+function showReply(text){
+  lastReply = text || "";
+  replyEl.innerHTML = "";
+  const s = document.createElement("span");
+  if (!text) { s.className = "hint"; s.textContent = "Toca el micrófono y habla"; }
+  else s.textContent = text;
+  replyEl.appendChild(s);
+  replyEl.scrollTop = 0;
+}
+
+// ── Chat (non-streaming: simpler + more robust on the watch browser) ──
+async function ask(message, opts){
+  const speak = !opts || opts.speak !== false;
+  setStatus("thinking", "Pensando…");
+  showReply("…");
+  try{
+    const r = await fetch(API + "/chat", {
+      method:"POST", headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ session_id: sessionId, message, channel: "dashboard" })
+    });
+    const j = await r.json();
+    const text = (j && j.response) || "⚠ Sin respuesta";
+    showReply(text);
+    if (speak) speakText(text); else setStatus("", "Rebeca");
+  }catch(e){
+    showReply("⚠ No pude conectar");
+    setStatus("", "Rebeca");
+  }
+}
+
+// ── Voice: push-to-talk (record → transcribe → ask → speak) ──
+let mediaRecorder = null, chunks = [], recording = false;
+const micSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+if (!micSupported){ $("mic").classList.add("disabled"); }
+
+async function toggleMic(){
+  if (!micSupported){ showReply("Este navegador no permite grabar. Usa los accesos rápidos."); return; }
+  const mic = $("mic");
+  if (recording){ recording = false; mic.classList.remove("rec"); mic.textContent = "🎙";
+    if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); return; }
+  ensureAudio();        // unlock TTS playback within this tap gesture
+  stopSpeaking();
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+  catch(e){ showReply("⚠ Sin acceso al micrófono"); return; }
+  chunks = [];
+  mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder.ondataavailable = (e)=>{ if (e.data.size) chunks.push(e.data); };
+  mediaRecorder.onstop = async ()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+    mic.classList.add("busy"); mic.textContent = "…"; setStatus("thinking","Transcribiendo…");
+    try{
+      const r = await fetch(API + "/voice/transcribe", { method:"POST", headers:{ "Content-Type": blob.type }, body: blob });
+      const j = await r.json();
+      if (j.ok && j.text){ showReply(j.text); ask(j.text, { speak:true }); }
+      else { showReply("⚠ No entendí el audio"); setStatus("","Rebeca"); }
+    }catch(e){ showReply("⚠ Error de transcripción"); setStatus("","Rebeca"); }
+    finally{ mic.classList.remove("busy"); mic.textContent = "🎙"; }
+  };
+  mediaRecorder.start(); recording = true;
+  mic.classList.add("rec"); mic.textContent = "●"; setStatus("listening","Escuchando…");
+}
+
+// ── TTS playback via Web Audio (bypasses delayed-autoplay blocking) ──
+let audioCtx = null, currentSource = null;
+function ensureAudio(){
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+function stopSpeaking(){
+  if (currentSource){ try{ currentSource.stop(); }catch(e){} currentSource = null; }
+  $("stop").style.display = "none";
+  if (dot.classList.contains("speaking")) setStatus("", "Rebeca");
+}
+async function speakText(text){
+  stopSpeaking();
+  try{
+    setStatus("speaking","Hablando…");
+    const r = await fetch(API + "/voice/speak", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ text }) });
+    if (!r.ok){ setStatus("","Rebeca"); return; }
+    const arr = await r.arrayBuffer();
+    ensureAudio();
+    if (audioCtx.state === "suspended") await audioCtx.resume();
+    const buf = await audioCtx.decodeAudioData(arr);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf; src.connect(audioCtx.destination);
+    src.onended = ()=>{ if (currentSource === src){ currentSource = null; stopSpeaking(); } };
+    currentSource = src; $("stop").style.display = "";
+    src.start(0);
+  }catch(e){ setStatus("","Rebeca"); }
+}
+
+// ── Wiring ──
+$("mic").addEventListener("click", toggleMic);
+$("stop").addEventListener("click", stopSpeaking);
+$("chips").addEventListener("click", (e)=>{
+  const b = e.target.closest(".chip"); if (!b) return;
+  ensureAudio();                                   // tap gesture unlocks audio
+  if (b.dataset.new){ sessionId = "watch-" + Math.random().toString(36).slice(2);
+    localStorage.setItem("rebeca_watch_sid", sessionId); stopSpeaking(); showReply(""); setStatus("","Rebeca"); return; }
+  if (b.dataset.repeat){ if (lastReply) speakText(lastReply); return; }
+  if (b.dataset.say){ stopSpeaking(); ask(b.dataset.say, { speak:true }); }
+});
+</script>
+</body>
+</html>

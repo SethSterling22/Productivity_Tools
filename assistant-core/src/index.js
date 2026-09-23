@@ -57,6 +57,10 @@ app.get("/health", async () => ({
 
 app.get("/tools", async () => ({ tools: listTools() }));
 
+// Clean URL for the watch UI (voice-first, circular layout for Wear OS).
+// The file is also reachable at /watch.html via the static handler.
+app.get("/watch", (req, reply) => reply.sendFile("watch.html"));
+
 // Re-index the second brain into Qdrant (run after adding/changing notes).
 app.post("/brain/reindex", async (req, reply) => {
   try {
