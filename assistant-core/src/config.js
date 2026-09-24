@@ -75,6 +75,10 @@ export const config = {
   // Shared secret for internal service-to-service calls (n8n -> assistant-core),
   // so they bypass the Google OAuth gate. Sent as the X-Internal-Token header.
   internalToken: process.env.INTERNAL_TOKEN || "",
+  // Secret that lets the Galaxy Watch use the /watch voice UI without the Google
+  // login flow. Presented once in the URL (?wt=TOKEN), then kept in a signed
+  // cookie. Scoped to the watch page + the endpoints it needs (see index.js).
+  watchToken: process.env.WATCH_TOKEN || "",
 
   // ── Tool manifest ──────────────────────────────────────────────────────────
   manifestPath: process.env.TOOLS_MANIFEST || path.join(__dirname, "..", "tools.manifest.json"),

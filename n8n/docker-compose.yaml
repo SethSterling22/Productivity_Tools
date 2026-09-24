@@ -189,6 +189,9 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-}
       # Shared token so n8n/Telegram calls bypass the OAuth gate.
       - INTERNAL_TOKEN=${INTERNAL_TOKEN:-}
+      # Secret for the Galaxy Watch voice UI (/watch?wt=TOKEN) — lets the watch in
+      # without the Google login flow. Empty = watch bypass disabled.
+      - WATCH_TOKEN=${WATCH_TOKEN:-}
     volumes:
       # Read-only access to the git-backed brain vault (in the hermes volume) so
       # the RAG indexer can read the notes at /hermes-workspace/brain.

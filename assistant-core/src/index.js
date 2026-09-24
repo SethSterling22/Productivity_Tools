@@ -27,6 +27,7 @@ const app = Fastify({ logger: true });
 
 const SESSION = "rebeca_session";
 const OAUTH_STATE = "rebeca_oauth_state";
+const WATCH = "rebeca_watch";
 const cookieOpts = () => ({ httpOnly: true, sameSite: "lax", path: "/", signed: true, secure: secureCookies() });
 
 // Gate every route except /health and /auth/* once Google OAuth is configured.
@@ -39,6 +40,25 @@ function installAuthGate() {
     if (p === "/health" || p.startsWith("/auth/")) return;
     // Internal service-to-service calls (n8n/Telegram) bypass OAuth via a shared token.
     if (config.internalToken && req.headers["x-internal-token"] === config.internalToken) return;
+    // Watch access: a long secret in the URL (?wt=TOKEN) sets a signed cookie, so
+    // the Galaxy Watch can use the voice UI without the Google login flow (which
+    // it can't complete from outside the tailnet). Scoped to /watch + the few
+    // endpoints that page calls; it does NOT open the rest of the dashboard.
+    if (config.watchToken) {
+      const wt = new URLSearchParams(req.url.split("?")[1] || "").get("wt");
+      const rawW = req.cookies?.[WATCH];
+      const unW = rawW ? req.unsignCookie(rawW) : { valid: false };
+      const okToken = (wt && wt === config.watchToken) || (unW.valid && unW.value === config.watchToken);
+      if (okToken) {
+        if (wt && wt === config.watchToken) {
+          reply.setCookie(WATCH, config.watchToken, { ...cookieOpts(), maxAge: 60 * 60 * 24 * 30 });
+        }
+        const watchAllowed =
+          p === "/watch" || p === "/watch.html" || p === "/chat" ||
+          p === "/chat/stream" || p.startsWith("/voice/");
+        if (watchAllowed) return;
+      }
+    }
     const raw = req.cookies?.[SESSION];
     const un = raw ? req.unsignCookie(raw) : { valid: false };
     if (un.valid && emailAllowed(un.value)) return;
