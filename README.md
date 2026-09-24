@@ -1,10 +1,19 @@
 # Productivity Tools — Personal Automation Stack
 
-A self-hosted, chat-driven automation stack. You talk to it over **Telegram**;
-**n8n** classifies what you want; a custom gateway called **Hermes** runs the
-right tool and answers using either a **local LLM (Ollama/Qwen)** or the
-**Claude API**. Around that core sit a set of task-specific agents (notes, tasks,
-content, progress, calendar) that turn a message into an action in your tools.
+A self-hosted, multi-channel personal assistant (**"Rebeca"**). You talk to it
+from a **web dashboard**, a **Galaxy Watch**, or **Telegram** (text + voice
+notes). At the center is **assistant-core**, a service that runs an LLM
+tool-calling loop, keeps conversation memory, streams chat, proxies voice
+(Whisper/Piper), and answers grounded in your **second brain** (RAG over Qdrant)
+and the **live web** (self-hosted SearXNG). It uses **Claude** as the primary LLM
+with a **local Ollama** fallback. **n8n** remains the integration hub (Telegram
+trigger, slash-command Router, tool sub-workflows), and the **Hermes** gateway
+provides low-level brain/fs/shell tools.
+
+> **Architecture, communication diagrams, network exposure (Tailscale Serve /
+> Funnel), and the Google OAuth flow are documented in
+> [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** The evolution plan lives in
+> [`docs/JARVIS_ROADMAP.md`](docs/JARVIS_ROADMAP.md).
 
 This repository is meant to be **reasonably portable**: the code and workflows
 are wired to a specific home lab today, but every infrastructure-specific value
@@ -20,22 +29,24 @@ stack can be lifted onto a similar architecture.
 ## Architecture
 
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│  Telegram  ─►  n8n (workflow)  ─►  Hermes gateway (:8080)  ─►  LLMs      │
-│                                                                         │
-│   • n8n           orchestrates the flow, classifies intent, routes      │
-│   • Hermes        HTTP gateway exposing tools (fs, shell, notes, LLMs)  │
-│   • Ollama/Qwen   local model for casual chat + intent classification   │
-│   • Claude API    high-quality answers (optional; falls back to Qwen)   │
-│                                                                         │
-│  External integrations: Obsidian (git), Linear, Google Calendar …       │
-└───────────────────────────────────────────────────────────────────────┘
+   Dashboard (tailnet)  ┐
+   Galaxy Watch (funnel) ├─►  assistant-core (Rebeca, :4000)  ─►  LLM (Claude / Ollama)
+   Telegram (funnel→n8n) ┘        • agent tool-calling loop         tools:
+                                   • memory (Postgres)               • builtin  (web_search, RAG)
+                                   • voice proxy (Whisper/Piper)     • Hermes   (brain, fs, shell)
+                                   • auth gate (OAuth / tokens)      • n8n      (Linear, Calendar)
+
+   Knowledge: second brain (git) ─► embeddings (Ollama) ─► Qdrant (RAG)
+   Web:       web_search ─► self-hosted SearXNG
 ```
 
-Today the stack runs as a **Docker Compose** deployment (n8n + Hermes gateway +
-PostgreSQL + a Tailscale sidecar) on an always-on host, and reaches Ollama on a
-separate GPU host over Tailscale. An optional Kubernetes manifest is included in
-`hermes-agent/k8s/` for cluster deployments.
+Today the stack runs as a **Docker Compose** deployment (assistant-core + n8n +
+Hermes gateway + PostgreSQL + Qdrant + SearXNG + a Tailscale sidecar) on an
+always-on host, reaching Ollama and the voice services on GPU hosts over Tailscale.
+An optional Kubernetes manifest is included in `hermes-agent/k8s/`.
+
+**See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for full component,
+communication, network-exposure, and Google-OAuth diagrams.**
 
 ---
 
@@ -43,10 +54,15 @@ separate GPU host over Tailscale. An optional Kubernetes manifest is included in
 
 | Component | Path | What it does |
 | --- | --- | --- |
-| **n8n workflow** | `n8n/cerebro_workflow_v2.json` | Telegram entry point, routing brain, agent orchestration. |
-| **Hermes gateway** | `hermes-agent/mcp-server/gateway.js` | HTTP server on `:8080`; exposes tools via `POST /tool/:name`. What n8n calls. |
+| **assistant-core (Rebeca)** | `assistant-core/` | Chat API + agent tool-calling loop, memory, voice proxy, auth gate; serves the dashboard and `/watch`. |
+| **Dashboard** | `assistant-core/public/index.html` | Web UI: streaming chat, push-to-talk voice, brain graph, calendar, sessions. Tailnet-only (Serve `:8443`). |
+| **Watch UI** | `assistant-core/public/watch.html` | Voice-first circular UI for the Galaxy Watch. Public Funnel `:10000` + watch token. |
+| **Tool manifest** | `assistant-core/tools.manifest.json` | Declares every capability; hot-reloaded. See `docs/ADDING_A_TOOL.md`. |
+| **n8n workflow** | `n8n/cerebro_workflow_v2.json` | Telegram entry point, slash-command Router, tool sub-workflows. |
+| **Hermes gateway** | `hermes-agent/mcp-server/gateway.js` | HTTP server on `:8080`; brain/fs/shell tools via `POST /tool/:name`. |
 | **Hermes MCP server** | `hermes-agent/mcp-server/server.js` | Native stdio MCP server (same tools) for MCP-native clients. |
-| **Compose stack** | `n8n/docker-compose.yaml` | n8n + hermes-gateway + postgres + tailscale. |
+| **Voice services** | `voice-services/` | Whisper (STT) + Piper (TTS) on GPU hosts (omarchy/sadida), with health-based failover. |
+| **Compose stack** | `n8n/docker-compose.yaml` | assistant-core + n8n + hermes + postgres + qdrant + searxng + tailscale. |
 | **Launch guide** | `LAUNCH.md` | Step-by-step bring-up. |
 
 Hermes tools: `fs_list`, `fs_read`, `fs_write`, `fs_delete` (gated), `shell_exec`
@@ -59,7 +75,12 @@ toggles (see `n8n/.env.example`).
 
 ## Routing model
 
-Every incoming message flows through the same decision path:
+> Note: this decision path applies to **Telegram slash-commands**. Free-form
+> conversation (dashboard, watch, voice, non-command Telegram text) is delegated to
+> **assistant-core (Rebeca)**, which runs its own LLM tool-calling loop over the
+> tool manifest. Router and assistant-core call the same tools.
+
+Every incoming Telegram message flows through the same decision path:
 
 1. **Extract message** — normalize the Telegram payload (`raw_text`, `chat_id`).
 2. **Fast route** — short-circuits without spending the classifier:
@@ -86,9 +107,11 @@ Every incoming message flows through the same decision path:
 | **Claude** | ✅ Live | Claude API → Qwen fallback | High-quality / technical answers. |
 | **Note (second brain)** | ✅ Live | Hermes `note_save` → git (Obsidian vault) | Writes Markdown notes and commits/pushes them to GitHub so the vault syncs across devices. |
 | **Task** | ✅ Live | Linear (GraphQL) | Creates an issue from the message (first line = title). |
-| **Content** | 🚧 Planned (phase 4) | TBD | Draft/expand written content. |
-| **Progress** | 🚧 Planned (phase 5) | TBD | Log and report on progress/status. |
-| **Calendar** | 🗓️ Planned | Google Calendar | See below. |
+| **Calendar** | ✅ Live | Google Calendar via n8n | Create events, list the day's/upcoming agenda (`create_event`, `list_today_events`). |
+| **Web search** | ✅ Live | SearXNG (self-hosted) | Current facts: weather, news, prices (`web_search` builtin). |
+| **Semantic brain (RAG)** | ✅ Live | Qdrant + Ollama embeddings | Answers grounded in your notes (`search_brain_semantic`). |
+| **Content** | 🚧 Planned | TBD | Draft/expand written content. |
+| **Progress** | 🚧 Planned | TBD | Log and report on progress/status. |
 
 ### Note agent — git-backed Obsidian vault
 
@@ -98,24 +121,17 @@ runs `git add/commit/push` so the vault stays in sync across every device via
 GitHub. Configure it with `HERMES_BRAIN_*` env vars (root path, remote, branch,
 optional SSH deploy key). See `LAUNCH.md`.
 
-### Calendar agent (planned) — Google Calendar
+### Calendar agent (live) — Google Calendar
 
-The calendar agent will turn natural-language requests ("agéndame una llamada
-mañana a las 3", "mueve mi reunión del viernes") into Google Calendar events.
+Rebeca turns natural-language requests ("agéndame una llamada mañana a las 3",
+"¿qué tengo hoy?") into Google Calendar actions.
 
-Planned design:
-
-- **Backend:** Google Calendar via n8n's native **Google Calendar** node
-  (OAuth2 credential stored in n8n, like the Telegram token — not in `.env`).
-- **New route:** add `CALENDAR` to the Router and a `/cal` slash command in
-  Fast route; teach the classifier to recognize scheduling language.
-- **Node chain (mirrors the Task agent):**
-  `Build event` (Code — parse title, start/end, attendees from `raw_text`) →
-  `Google Calendar — Create event` → `Parse event` (Code — format the ✅/⚠️
-  reply with the event link).
-- **Capabilities:** create events, quick-add from text, move/reschedule, set
-  reminders, and read the day's agenda ("¿qué tengo hoy?").
-- **Time zone:** default to the user's TZ; make it a single configurable value.
+- **Backend:** Google Calendar via n8n's native **Google Calendar** node (OAuth2
+  credential stored in n8n, not in `.env`), exposed as the `create_event` and
+  `list_today_events` tool webhooks.
+- **Time zone:** America/Puerto_Rico (UTC-04:00); assistant-core injects the
+  current date/time into the system prompt so relative dates resolve correctly and
+  events are created with the right ISO 8601 offset.
 
 ---
 

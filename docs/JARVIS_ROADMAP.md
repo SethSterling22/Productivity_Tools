@@ -87,7 +87,12 @@ voice note.
 | Second-brain graph | Dashboard | `brain_graph` (Hermes) + force-graph |
 | Today's calendar | Dashboard, Telegram (/calendar) | Google Calendar via n8n |
 | Capabilities / status panel | Dashboard | tool manifest + health checks |
+| Web search (weather, news, current facts) | Dashboard, Telegram, Watch | `web_search` builtin → self-hosted SearXNG |
+| Watch UI (voice-first, circular) | Galaxy Watch | `/watch` page → assistant-core via public Funnel + watch token |
 | Existing commands (task, note, plan, show_brain, schedule, …) | Telegram, Dashboard | n8n tool sub-workflows |
+
+> Full component/communication diagrams, network exposure, and the Google OAuth
+> flow are documented in [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ---
 
@@ -219,6 +224,18 @@ that makes the assistant "adapt easily to any future n8n tool."
 - ⬜ Optional cleanup: delete the now-orphaned "Hermes — Classify intent" node in
   the cerebro workflow (free-text goes to Rebeca now).
 - ⬜ Optional: auto-generate the manifest from tagged n8n sub-workflows.
+
+### Post-Phase-4 additions  ✅ DONE
+- ✅ **Web search**: `web_search` builtin backed by a self-hosted **SearXNG**
+  container (no API key). Gives Rebeca weather/news/current facts across all
+  channels. See [ADDING_A_TOOL.md](./ADDING_A_TOOL.md) for the builtin pattern.
+- ✅ **Watch UI** (`public/watch.html`, route `/watch`): voice-first, circular
+  layout for the Galaxy Watch. Reached over a public **Tailscale Funnel on :10000**
+  and authorized by a scoped **watch token** (`?wt=`), so the rest of the dashboard
+  stays behind Google OAuth. See [ARCHITECTURE.md](./ARCHITECTURE.md) §2 and §5.
+- ✅ **DB migration resilience**: assistant-core retries the startup migration with
+  backoff so it self-heals after a cold boot (e.g. a power outage) without a manual
+  restart.
 
 ---
 
