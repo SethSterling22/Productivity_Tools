@@ -3,12 +3,14 @@
   "tools": [
     {
       "name": "create_task",
-      "description": "Create a task/issue in Linear. Use when the user wants to remember a to-do or action item.",
+      "description": "Create a task/issue in Linear. Use when the user wants to remember a to-do or action item. Optionally assign it to a project, or make it a subtask of another issue by passing that issue's id as 'parent' (get ids from list_tasks / list_projects).",
       "input_schema": {
         "type": "object",
         "properties": {
           "title": { "type": "string", "description": "Short imperative title." },
-          "description": { "type": "string", "description": "Optional details/context." }
+          "description": { "type": "string", "description": "Optional details/context." },
+          "project": { "type": "string", "description": "Optional Linear project id to file it under (from list_projects)." },
+          "parent": { "type": "string", "description": "Optional parent issue id to make this a subtask (from list_tasks)." }
         },
         "required": ["title"]
       },
@@ -120,17 +122,25 @@
     },
     {
       "name": "list_tasks",
-      "description": "List the user's Linear tasks/issues, optionally filtered by state. Use for 'what's on my plate', 'what's pending', 'show my tasks'. Returns id, title, state, priority, and url.",
+      "description": "List the user's Linear tasks/issues grouped by project, with subtasks nested under their parent. Use for 'what's on my plate', 'what's pending', 'show my tasks'. Returns { projects: [ { name, tasks: [ { id, ref, title, state, priority, url, children:[...] } ] } ] }.",
       "input_schema": {
         "type": "object",
         "properties": {
           "state": { "type": "string", "description": "Optional state filter, e.g. 'Todo', 'In Progress', 'Done', 'Backlog'." },
-          "limit": { "type": "integer", "description": "Max tasks (default 20)." }
+          "limit": { "type": "integer", "description": "Max tasks (default 50)." }
         }
       },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/list_tasks" },
       "channels": ["dashboard", "telegram"],
       "icon": "list-checks"
+    },
+    {
+      "name": "list_projects",
+      "description": "List the user's active Linear projects (id, name, progress). Use to group tasks, to answer 'what projects do I have', or to get a project id before creating a task under it.",
+      "input_schema": { "type": "object", "properties": {} },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/list_projects" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "folder"
     },
     {
       "name": "update_task",

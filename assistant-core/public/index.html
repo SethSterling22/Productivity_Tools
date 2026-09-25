@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>REBECA</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <script src="https://cdn.jsdelivr.net/npm/force-graph@1.43.5/dist/force-graph.min.js"></script>
 <style>
   :root {
@@ -229,7 +230,15 @@
   .task .tt a:hover { color: var(--lime); }
   .task .st { font-size: 10px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; }
   .task.p1 .tt { border-left: 2px solid var(--coral); padding-left: 6px; }
-  #tasks { max-height: 260px; overflow-y: auto; }
+  #tasks { max-height: 320px; overflow-y: auto; }
+  .proj { margin-bottom: 6px; }
+  .proj-h { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 5px 0; border-bottom: 1px solid var(--border-hi);
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text); }
+  .proj-h .arw { color: var(--muted); font-size: 9px; width: 10px; }
+  .proj-h .proj-c { margin-left: auto; color: var(--muted); }
+  .task.sub { padding-left: 22px; position: relative; }
+  .task.sub::before { content: "\21B3"; position: absolute; left: 8px; top: 7px; color: var(--muted); font-size: 11px; }
+  .task.sub .tt { font-size: 12px; }
 
   /* ── Command palette (Ctrl-K) ── */
   #paletteWrap { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.55); }
@@ -723,25 +732,43 @@ async function invokeTool(name, input) {
   return r.json();
 }
 
-// ── Tasks (Linear) widget ──
+// ── Tasks (Linear) widget: grouped by project, subtasks nested ──
+function taskRow(t, isChild) {
+  const done = t.type === "completed";
+  const p1 = t.priority === 1 ? " p1" : "";
+  const sub = isChild ? " sub" : "";
+  const title = t.url ? '<a href="' + esc(t.url) + '" target="_blank" rel="noopener">' + esc(t.title) + "</a>" : esc(t.title);
+  const meta = (t.ref ? t.ref + " · " : "") + (t.state || "");
+  return '<div class="task' + p1 + sub + '" data-id="' + esc(t.id) + '">' +
+    '<div class="chk" title="Marcar hecha"' + (done ? ' style="background:var(--lime)"' : "") + "></div>" +
+    '<div style="flex:1"><div class="tt">' + title + '</div><div class="st">' + esc(meta) + "</div></div></div>";
+}
 async function loadTasks() {
   try {
-    const r = await invokeTool("list_tasks", { limit: 15 });
-    const tasks = (r && r.tasks) || [];
+    const r = await invokeTool("list_tasks", { limit: 50 });
     if (r && r.ok === false) throw new Error(r.error || "error");
-    if (!tasks.length) { $("tasks").innerHTML = '<span class="empty">Sin tareas.</span>'; return; }
-    $("tasks").innerHTML = tasks.map((t) => {
-      const done = t.type === "completed";
-      const p1 = t.priority === 1 ? " p1" : "";
-      const title = t.url ? '<a href="' + esc(t.url) + '" target="_blank" rel="noopener">' + esc(t.title) + "</a>" : esc(t.title);
-      return '<div class="task' + p1 + '" data-id="' + esc(t.id) + '">' +
-        '<div class="chk" title="Marcar hecha"' + (done ? ' style="background:var(--lime)"' : "") + "></div>" +
-        '<div style="flex:1"><div class="tt">' + title + '</div><div class="st">' + esc(t.state || "") + "</div></div></div>";
-    }).join("");
+    const projects = (r && r.projects) || [];
+    if (!projects.length) { $("tasks").innerHTML = '<span class="empty">Sin tareas.</span>'; return; }
+    let html = "";
+    for (const p of projects) {
+      const total = p.tasks.length + p.tasks.reduce((s, t) => s + (t.children ? t.children.length : 0), 0);
+      html += '<div class="proj"><div class="proj-h"><span class="arw">▾</span>' + esc(p.name) + '<span class="proj-c">' + total + "</span></div><div class=\"proj-body\">";
+      for (const t of p.tasks) {
+        html += taskRow(t, false);
+        for (const c of (t.children || [])) html += taskRow(c, true);
+      }
+      html += "</div></div>";
+    }
+    $("tasks").innerHTML = html;
     $("tasks").querySelectorAll(".task .chk").forEach((el) => el.onclick = async () => {
       el.style.background = "var(--lime)";
       await invokeTool("complete_task", { id: el.closest(".task").dataset.id, state: "Done" });
       loadTasks();
+    });
+    $("tasks").querySelectorAll(".proj-h").forEach((el) => el.onclick = () => {
+      const body = el.nextElementSibling, open = body.style.display !== "none";
+      body.style.display = open ? "none" : "";
+      el.querySelector(".arw").textContent = open ? "▸" : "▾";
     });
   } catch { $("tasks").innerHTML = '<span class="empty">Tareas no disponibles.</span>'; }
 }

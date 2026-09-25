@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d = $json.body || $json || {};\nconst title = String(d.title || 'Untitled task').slice(0, 200);\nconst description = String(d.description || '');\n// TODO: set your Linear team UUID (same as the cerebro workflow's Build task).\nconst LINEAR_TEAM_ID = 'REPLACE_WITH_LINEAR_TEAM_UUID';\nconst body = {\n  query: 'mutation CreateIssue($teamId: String!, $title: String!, $description: String) { issueCreate(input: { teamId: $teamId, title: $title, description: $description }) { success issue { identifier title url } } }',\n  variables: { teamId: LINEAR_TEAM_ID, title, description }\n};\nreturn [{ json: { requestBody: JSON.stringify(body) } }];"
+        "jsCode": "const d = $json.body || $json || {};\nconst title = String(d.title || 'Untitled task').slice(0, 200);\nconst description = String(d.description || '');\n// TODO: set your Linear team UUID (same as the cerebro workflow's Build task).\nconst LINEAR_TEAM_ID = 'REPLACE_WITH_LINEAR_TEAM_UUID';\nconst input = { teamId: LINEAR_TEAM_ID, title, description };\nif (d.project) input.projectId = d.project;   // assign to a project (id)\nif (d.parent) input.parentId = d.parent;      // make it a subtask of this issue (id)\nconst body = {\n  query: 'mutation CreateIssue($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { identifier title url } } }',\n  variables: { input }\n};\nreturn [{ json: { requestBody: JSON.stringify(body) } }];"
       },
       "id": "build-create-task-0002",
       "name": "Build task",
