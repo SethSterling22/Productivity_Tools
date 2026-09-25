@@ -10,36 +10,21 @@
 
 import { config } from "./config.js";
 
-// Default homelab panels. Each returns a vector keyed by instance/gpu.
+// Default homelab panels, calibrated to this homelab's exporters:
+//   - node_exporter (+ recording rules node:cpu/memory_utilization:ratio)
+//   - nvidia_gpu_exporter (nvidia_smi_* metrics)
+// Each query should return a per-node/per-GPU vector. Override with METRICS_PANELS.
 const DEFAULT_PANELS = [
-  {
-    label: "CPU",
-    unit: "%",
-    query: '100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)',
-  },
-  {
-    label: "RAM",
-    unit: "%",
-    query: "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))",
-  },
+  { label: "CPU", unit: "%", query: "node:cpu_utilization:ratio * 100" },
+  { label: "RAM", unit: "%", query: "node:memory_utilization:ratio * 100" },
   {
     label: "Disk /",
     unit: "%",
     query:
       '100 * (1 - (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay|squashfs"}))',
   },
-  {
-    label: "GPU util",
-    unit: "%",
-    // DCGM exporter. If you use nvidia_gpu_exporter use e.g.
-    // nvidia_smi_utilization_gpu_ratio*100. Override via METRICS_PANELS.
-    query: "DCGM_FI_DEV_GPU_UTIL",
-  },
-  {
-    label: "GPU mem",
-    unit: "%",
-    query: "100 * DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE)",
-  },
+  { label: "GPU util", unit: "%", query: "nvidia_smi_utilization_gpu_ratio * 100" },
+  { label: "VRAM", unit: "%", query: "100 * nvidia_smi_memory_used_bytes / nvidia_smi_memory_total_bytes" },
 ];
 
 export function metricsEnabled() {
@@ -73,11 +58,13 @@ export async function promInstant(query) {
   }
 }
 
-// A friendly label for a series (node hostname, gpu id, or the instance).
+// A friendly label for a series. Prefer the `node` label (this Prometheus relabels
+// scrapes with it), then the instance host, then GPU name.
 function seriesLabel(metric) {
+  if (metric.node) return metric.node;
   const inst = metric.instance || "";
   const host = inst.split(":")[0]; // drop :9100 etc.
-  return host || metric.gpu || metric.Hostname || metric.job || "value";
+  return host || metric.name || metric.gpu || metric.Hostname || metric.job || "value";
 }
 
 // Build the homelab widget panels. Never throws — on error a panel carries an
