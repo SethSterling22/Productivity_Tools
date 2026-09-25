@@ -165,19 +165,28 @@
   }
 
   /* ── Model indicator ── */
-  .modelchip {
-    margin-left: 10px; font-family: var(--mono); font-size: 10px; color: var(--muted);
-    border: 1px solid var(--border); padding: 2px 7px; text-transform: lowercase; letter-spacing: .3px;
-    max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .modelpick { position: relative; margin-left: 10px; }
+  .modelbtn {
+    background: var(--panel2); color: var(--muted); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px; padding: 3px 8px; cursor: pointer; letter-spacing: .3px;
+    text-transform: lowercase; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .modelchip b { color: var(--lime); font-weight: 600; }
-  .modelsel {
-    margin-left: 10px; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
-    font-family: var(--mono); font-size: 10px; padding: 3px 6px; max-width: 200px; outline: none; cursor: pointer;
+  .modelbtn:hover { border-color: var(--border-hi); }
+  .modelbtn b { color: var(--lime); font-weight: 600; }
+  .modelmenu {
+    display: none; position: absolute; right: 0; top: calc(100% + 4px); z-index: 60;
+    background: var(--panel); border: 1px solid var(--border-hi); min-width: 210px; max-height: 60vh;
+    overflow-y: auto; box-shadow: 0 12px 30px rgba(0,0,0,.55);
   }
-  .modelsel:focus { border-color: var(--lime); }
-  .modelsel option:disabled { color: var(--muted); }
-  @media (max-width: 859px) { .modelchip, .modelsel { display: none; } }
+  .modelmenu.open { display: block; }
+  .mm-group { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding: 8px 10px 3px; border-top: 1px solid var(--border); }
+  .mm-group:first-child { border-top: none; }
+  .mm-item { padding: 6px 12px; font-family: var(--mono); font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .mm-item:hover { background: rgba(188,191,86,.10); }
+  .mm-item.sel { color: var(--lime); }
+  .mm-item.disabled { color: var(--muted); opacity: .5; cursor: default; }
+  .mm-item.disabled:hover { background: none; }
+  @media (max-width: 859px) { .modelpick { display: none; } }
 
   /* ── Homelab / status widget ── */
   .svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -247,8 +256,10 @@
       <h1>Rebeca</h1>
       <button id="convosToggle" title="Conversaciones" aria-label="Conversaciones">🗂</button>
       <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">conectando</span></div>
-      <select id="modelSelect" class="modelsel" title="Elegir modelo (Auto = el router decide)"><option value="auto">auto · router</option></select>
-      <span class="modelchip" id="modelChip" title="Modelo usado en la última respuesta"></span>
+      <div class="modelpick" id="modelPick">
+        <button class="modelbtn" id="modelBtn" title="Modelo (auto = el router decide; clic para elegir)">auto · router</button>
+        <div class="modelmenu" id="modelMenu"></div>
+      </div>
       <button id="panelToggle" title="Panel" aria-label="Panel">☰</button>
     </div>
     <div class="messages" id="messages"></div>
@@ -367,7 +378,7 @@ async function send(opts) {
           if (event === "tool_call") addTool(data.name, "→ llamando");
           else if (event === "tool_result") addTool(data.name, "✓ resultado de");
           else if (event === "route") lastRoute = data.category;
-          else if (event === "model") setModelChip(data);
+          else if (event === "model") onModelUsed(data);
           else if (event === "text") { if (data.text) { finalText = data.text; if (!asstEl) asstEl = addMsg("assistant", ""); asstEl.innerHTML = linkify(data.text); messages.scrollTop = messages.scrollHeight; } }
           else if (event === "error") addMsg("assistant", "⚠ " + (data.message || "error"));
         }
@@ -647,38 +658,61 @@ function newChat() {
   messages.innerHTML = "";
   addMsg("assistant", "Nueva conversación. ¿En qué te ayudo, Sebastian?");
 }
-// ── Model indicator + manual selector ──
+// ── Model picker: one control that is both the selector and the last-used
+//    indicator. In "auto" it shows what the router picked ("auto · model @host");
+//    when a model is forced it shows that model. ──
 let lastRoute = "";
 let selectedModel = localStorage.getItem("rebeca_model") || "auto";
+let modelsData = [];
+let lastUsed = null;
 function shortModel(m) { return String(m || "").replace(/^claude-/, "").replace(/-\d{6,}$/, ""); }
-function setModelChip(d) {
-  if (!d) return;
-  const model = d.model || d.provider || "";
-  const host = d.host ? " @" + d.host : "";
-  $("modelChip").innerHTML = (lastRoute ? esc(lastRoute) + " · " : "") + "<b>" + esc(shortModel(model)) + "</b>" + esc(host);
+function fmtUsed(d) {
+  if (!d) return "";
+  const m = shortModel(d.model || d.provider || "");
+  return "<b>" + esc(m) + "</b>" + (d.host ? esc(" @" + d.host) : "");
 }
-// Populate the dropdown from /models (auto-discovered; unavailable ones greyed).
-async function loadModels() {
-  let models = [];
-  try { models = (await (await fetch(API + "/models")).json()).models || []; } catch {}
+function updateBtn() {
+  const btn = $("modelBtn");
+  if (selectedModel === "auto") {
+    btn.innerHTML = "auto · " + (lastUsed ? fmtUsed(lastUsed) : "router");
+  } else {
+    const m = modelsData.find((x) => x.id === selectedModel);
+    btn.innerHTML = m ? fmtUsed(m) : "<b>" + esc(selectedModel) + "</b>";
+  }
+}
+function onModelUsed(d) { if (!d) return; lastUsed = d; if (selectedModel === "auto") updateBtn(); }
+function renderMenu() {
   const groups = {};
-  for (const m of models) (groups[m.host] = groups[m.host] || []).push(m);
-  let html = '<option value="auto">auto · router</option>';
+  for (const m of modelsData) (groups[m.host] = groups[m.host] || []).push(m);
+  let html = '<div class="mm-item' + (selectedModel === "auto" ? " sel" : "") + '" data-id="auto">auto · router</div>';
   for (const host of Object.keys(groups)) {
-    html += '<optgroup label="' + esc(host) + '">';
+    html += '<div class="mm-group">' + esc(host) + "</div>";
     for (const m of groups[host]) {
       const lbl = m.provider === "anthropic" ? shortModel(m.model) : m.model;
-      html += '<option value="' + esc(m.id) + '"' + (m.available ? "" : " disabled") + ">" + esc(lbl) + (m.available ? "" : " — offline") + "</option>";
+      const cls = "mm-item" + (m.available ? "" : " disabled") + (m.id === selectedModel ? " sel" : "");
+      html += '<div class="' + cls + '" data-id="' + esc(m.id) + '"' + (m.available ? "" : ' data-off="1"') + ">" + esc(lbl) + (m.available ? "" : " — offline") + "</div>";
     }
-    html += "</optgroup>";
   }
-  const sel = $("modelSelect");
-  sel.innerHTML = html;
-  // keep the current choice if it's still available, else fall back to auto
-  if ([...sel.options].some((o) => o.value === selectedModel && !o.disabled)) sel.value = selectedModel;
-  else { selectedModel = "auto"; sel.value = "auto"; localStorage.setItem("rebeca_model", "auto"); }
+  const menu = $("modelMenu");
+  menu.innerHTML = html;
+  menu.querySelectorAll(".mm-item[data-id]").forEach((el) => el.onclick = () => {
+    if (el.dataset.off) return;
+    selectedModel = el.dataset.id;
+    localStorage.setItem("rebeca_model", selectedModel);
+    menu.classList.remove("open");
+    renderMenu(); updateBtn();
+  });
 }
-$("modelSelect").onchange = (e) => { selectedModel = e.target.value; localStorage.setItem("rebeca_model", selectedModel); };
+async function loadModels() {
+  try { modelsData = (await (await fetch(API + "/models")).json()).models || []; } catch { modelsData = []; }
+  if (selectedModel !== "auto") {
+    const m = modelsData.find((x) => x.id === selectedModel);
+    if (!m || !m.available) { selectedModel = "auto"; localStorage.setItem("rebeca_model", "auto"); }
+  }
+  renderMenu(); updateBtn();
+}
+$("modelBtn").onclick = (e) => { e.stopPropagation(); $("modelMenu").classList.toggle("open"); };
+document.addEventListener("click", (e) => { if (!e.target.closest("#modelPick")) $("modelMenu").classList.remove("open"); });
 
 // ── Generic tool invocation (task widget + command palette) ──
 async function invokeTool(name, input) {
