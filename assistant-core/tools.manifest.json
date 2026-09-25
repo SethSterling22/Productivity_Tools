@@ -103,6 +103,67 @@
       "endpoint": { "type": "builtin", "name": "web_search" },
       "channels": ["dashboard", "telegram"],
       "icon": "globe"
+    },
+    {
+      "name": "query_metrics",
+      "description": "Query the homelab's Prometheus with a PromQL expression to read live metrics (CPU, RAM, disk, GPU utilization/memory, service up/down). Use when the user asks about the state or health of the homelab or a node, or when a decision depends on current resource usage (e.g. 'is the GPU free?', 'how full is Ocra's disk?', 'which node is under load?'). Returns matching series with labels and values.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "A PromQL expression, e.g. 'DCGM_FI_DEV_GPU_UTIL', 'node_filesystem_avail_bytes{mountpoint=\"/\"}', or 'up'." }
+        },
+        "required": ["query"]
+      },
+      "endpoint": { "type": "builtin", "name": "query_metrics" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "activity"
+    },
+    {
+      "name": "list_tasks",
+      "description": "List the user's Linear tasks/issues, optionally filtered by state. Use for 'what's on my plate', 'what's pending', 'show my tasks'. Returns id, title, state, priority, and url.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "state": { "type": "string", "description": "Optional state filter, e.g. 'Todo', 'In Progress', 'Done', 'Backlog'." },
+          "limit": { "type": "integer", "description": "Max tasks (default 20)." }
+        }
+      },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/list_tasks" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "list-checks"
+    },
+    {
+      "name": "update_task",
+      "description": "Update an existing Linear task/issue: title, description, priority, or due date. Requires the task id (get it from list_tasks).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Linear issue id." },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "priority": { "type": "integer", "description": "0=none,1=urgent,2=high,3=normal,4=low." },
+          "due_date": { "type": "string", "description": "ISO date, e.g. 2026-10-01." }
+        },
+        "required": ["id"]
+      },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/update_task" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "edit"
+    },
+    {
+      "name": "complete_task",
+      "description": "Change a Linear task's status/state (e.g. mark it done, or move To do → In progress). Requires the task id.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Linear issue id." },
+          "state": { "type": "string", "description": "Target state name, e.g. 'Done', 'In Progress', 'Todo'. Defaults to 'Done'." }
+        },
+        "required": ["id"]
+      },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/complete_task" },
+      "channels": ["dashboard", "telegram"],
+      "icon": "check-circle"
     }
   ]
 }

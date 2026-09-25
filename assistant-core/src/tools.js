@@ -9,11 +9,13 @@ import fsp from "node:fs/promises";
 import { config } from "./config.js";
 import * as rag from "./rag.js";
 import { webSearch } from "./websearch.js";
+import { queryMetrics } from "./metrics.js";
 
 // Tools implemented in-process (no external HTTP hop).
 const BUILTINS = {
   search_brain_semantic: (input) => rag.searchBrain(input || {}),
   web_search: (input) => webSearch(input || {}),
+  query_metrics: (input) => queryMetrics(input || {}),
 };
 
 let manifest = { version: 0, tools: [] };

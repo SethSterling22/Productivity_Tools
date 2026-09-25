@@ -1,0 +1,92 @@
+{
+  "name": "Linear tools (list / update / complete)",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "tool/list_tasks", "responseMode": "lastNode", "options": {} },
+      "id": "lt-webhook", "name": "list_tasks · Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [240, 120], "webhookId": "tool-list-tasks"
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'query($n:Int){ viewer { assignedIssues(first:$n, orderBy:updatedAt){ nodes{ id identifier title priority url state{ name type } } } } }', variables: { n: ($json.body && $json.body.limit) ? $json.body.limit : 20 } }) }}",
+        "options": {}
+      },
+      "id": "lt-http", "name": "Linear — list", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [460, 120],
+      "credentials": { "httpHeaderAuth": { "name": "Linear API" } }
+    },
+    {
+      "parameters": { "jsCode": "const want = ($('list_tasks · Webhook').first().json.body || {}).state;\nconst nodes = (($json.data||{}).viewer||{}).assignedIssues?.nodes || [];\nconst norm = s => (s||'').toLowerCase();\nlet tasks = nodes.map(n => ({ id:n.id, ref:n.identifier, title:n.title, priority:n.priority, state:n.state?.name, type:n.state?.type, url:n.url }));\nif (want) tasks = tasks.filter(t => norm(t.state) === norm(want) || norm(t.type) === norm(want));\nreturn [{ json: { ok:true, count:tasks.length, tasks } }];" },
+      "id": "lt-shape", "name": "Shape list", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [680, 120]
+    },
+
+    {
+      "parameters": { "httpMethod": "POST", "path": "tool/update_task", "responseMode": "lastNode", "options": {} },
+      "id": "ut-webhook", "name": "update_task · Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [240, 300], "webhookId": "tool-update-task"
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={{ (() => { const b = $json.body || {}; const input = {}; if (b.title) input.title = b.title; if (b.description) input.description = b.description; if (b.priority !== undefined && b.priority !== null) input.priority = b.priority; if (b.due_date) input.dueDate = b.due_date; return JSON.stringify({ query: 'mutation($id:String!,$input:IssueUpdateInput!){ issueUpdate(id:$id,input:$input){ success issue{ id title url state{ name } } } }', variables: { id: b.id, input } }); })() }}",
+        "options": {}
+      },
+      "id": "ut-http", "name": "Linear — update", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [460, 300],
+      "credentials": { "httpHeaderAuth": { "name": "Linear API" } }
+    },
+    {
+      "parameters": { "jsCode": "const r = (($json.data||{}).issueUpdate) || {};\nif (!r.success) return [{ json: { ok:false, error:'Linear update failed', raw: $json } }];\nconst i = r.issue || {};\nreturn [{ json: { ok:true, result: `Task updated: ${i.title}`, id:i.id, url:i.url, state:i.state?.name } }];" },
+      "id": "ut-shape", "name": "Shape update", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [680, 300]
+    },
+
+    {
+      "parameters": { "httpMethod": "POST", "path": "tool/complete_task", "responseMode": "lastNode", "options": {} },
+      "id": "ct-webhook", "name": "complete_task · Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [240, 500], "webhookId": "tool-complete-task"
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'query($id:String!){ issue(id:$id){ id team{ id states{ nodes{ id name type } } } } }', variables: { id: ($json.body||{}).id } }) }}",
+        "options": {}
+      },
+      "id": "ct-states", "name": "Linear — get states", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [460, 500],
+      "credentials": { "httpHeaderAuth": { "name": "Linear API" } }
+    },
+    {
+      "parameters": { "jsCode": "const b = $('complete_task · Webhook').first().json.body || {};\nconst target = (b.state || 'Done');\nconst states = ((($json.data||{}).issue||{}).team||{}).states?.nodes || [];\nconst norm = s => (s||'').toLowerCase();\nlet st = states.find(s => norm(s.name) === norm(target));\nif (!st && norm(target) === 'done') st = states.find(s => s.type === 'completed');\nif (!st) return [{ json: { ok:false, error:`State '${target}' not found for this issue's team.`, available: states.map(s=>s.name) } }];\nreturn [{ json: { id: b.id, stateId: st.id, stateName: st.name } }];" },
+      "id": "ct-pick", "name": "Pick state", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: 'mutation($id:String!,$stateId:String!){ issueUpdate(id:$id,input:{stateId:$stateId}){ success issue{ id title url state{ name } } } }', variables: { id: $json.id, stateId: $json.stateId } }) }}",
+        "options": {}
+      },
+      "id": "ct-update", "name": "Linear — set state", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [900, 500],
+      "credentials": { "httpHeaderAuth": { "name": "Linear API" } }
+    },
+    {
+      "parameters": { "jsCode": "if ($json.ok === false) return [{ json: $json }];\nconst r = (($json.data||{}).issueUpdate) || {};\nif (!r.success) return [{ json: { ok:false, error:'Linear state change failed', raw: $json } }];\nconst i = r.issue || {};\nreturn [{ json: { ok:true, result: `Task moved to ${i.state?.name}: ${i.title}`, id:i.id, url:i.url, state:i.state?.name } }];" },
+      "id": "ct-shape", "name": "Shape complete", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1120, 500]
+    }
+  ],
+  "connections": {
+    "list_tasks · Webhook": { "main": [[{ "node": "Linear — list", "type": "main", "index": 0 }]] },
+    "Linear — list": { "main": [[{ "node": "Shape list", "type": "main", "index": 0 }]] },
+
+    "update_task · Webhook": { "main": [[{ "node": "Linear — update", "type": "main", "index": 0 }]] },
+    "Linear — update": { "main": [[{ "node": "Shape update", "type": "main", "index": 0 }]] },
+
+    "complete_task · Webhook": { "main": [[{ "node": "Linear — get states", "type": "main", "index": 0 }]] },
+    "Linear — get states": { "main": [[{ "node": "Pick state", "type": "main", "index": 0 }]] },
+    "Pick state": { "main": [[{ "node": "Linear — set state", "type": "main", "index": 0 }]] },
+    "Linear — set state": { "main": [[{ "node": "Shape complete", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

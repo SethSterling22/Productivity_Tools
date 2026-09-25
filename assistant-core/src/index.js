@@ -20,6 +20,7 @@ import { loadManifest, watchManifest, listTools, dispatch } from "./tools.js";
 import { runAgent } from "./agent.js";
 import * as memory from "./memory.js";
 import * as rag from "./rag.js";
+import { homelabPanels, metricsEnabled } from "./metrics.js";
 import { authEnabled, loginUrl, exchangeCode, emailAllowed, secureCookies } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -76,6 +77,18 @@ app.get("/health", async () => ({
 }));
 
 app.get("/tools", async () => ({ tools: listTools() }));
+
+// Invoke a tool directly (used by the dashboard's task widget and command palette).
+// Behind the auth gate like the rest of the dashboard API.
+app.post("/tools/invoke", async (req, reply) => {
+  const { name, input } = req.body || {};
+  if (!name) return reply.code(400).send({ ok: false, error: "name required" });
+  try {
+    return await dispatch(name, input || {});
+  } catch (err) {
+    return reply.code(500).send({ ok: false, error: err.message });
+  }
+});
 
 // Clean URL for the watch UI (voice-first, circular layout for Wear OS).
 // The file is also reachable at /watch.html via the static handler.
@@ -168,6 +181,43 @@ app.get("/widgets/calendar", async () => {
   } catch (err) {
     return { ok: false, error: err.message };
   }
+});
+
+// Homelab / status widget: service health (up/down + latency) plus Prometheus
+// panels (CPU/RAM/disk/GPU per node). Metrics section is empty if PROMETHEUS_URL
+// is unset; service health always works.
+const HEALTH_TIMEOUT = 1500;
+function svcTargets() {
+  return [
+    { name: "assistant-core", url: `http://127.0.0.1:${config.port}/health` },
+    { name: "hermes", url: `${config.hermesUrl}/health` },
+    { name: "n8n", url: "http://127.0.0.1:5678/healthz" },
+    { name: "qdrant", url: `${config.qdrantUrl}/healthz` },
+    { name: "searxng", url: `${config.searxngUrl}/healthz` },
+    { name: "ollama:sadida", url: `${config.ollamaHosts.sadida}/api/tags` },
+    { name: "ollama:omarchy", url: `${config.ollamaHosts.omarchy}/api/tags` },
+    { name: "whisper", url: `${config.whisperUrls[0]}/health` },
+    { name: "piper", url: `${config.piperUrls[0]}/health` },
+  ];
+}
+async function checkService(s) {
+  const started = Date.now();
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), HEALTH_TIMEOUT);
+    const res = await fetch(s.url, { signal: ctl.signal });
+    clearTimeout(t);
+    return { name: s.name, up: res.ok, ms: Date.now() - started };
+  } catch {
+    return { name: s.name, up: false, ms: Date.now() - started };
+  }
+}
+app.get("/widgets/homelab", async () => {
+  const [services, panels] = await Promise.all([
+    Promise.all(svcTargets().map(checkService)),
+    homelabPanels().catch(() => []),
+  ]);
+  return { services, panels, metricsEnabled: metricsEnabled() };
 });
 
 // Second-brain graph, straight from the Hermes brain_graph tool.

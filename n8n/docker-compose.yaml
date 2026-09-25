@@ -186,6 +186,11 @@ services:
       - BRAIN_WEB_URL=${HERMES_BRAIN_WEB_URL:-https://github.com/SethSterling22/Brain}
       # Web search (SearXNG) for the web_search builtin (current events, weather...).
       - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
+      # Homelab metrics: direct PromQL to Prometheus (homelab widget + query_metrics
+      # tool). Empty = metrics off (widget shows service health only).
+      - PROMETHEUS_URL=${PROMETHEUS_URL:-}
+      # Optional: override the homelab metric panels (JSON array of {label,query,unit}).
+      - METRICS_PANELS=${METRICS_PANELS:-}
       # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).
       - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}

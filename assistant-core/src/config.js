@@ -48,6 +48,15 @@ export const config = {
   // Docker DNS on n8n_network, like Qdrant. No API key needed.
   searxngUrl: process.env.SEARXNG_URL || "http://searxng:8080",
 
+  // ── Homelab metrics (Prometheus) ────────────────────────────────────────────
+  // Direct PromQL against Prometheus for the homelab widget + query_metrics tool.
+  // Empty = metrics disabled (widget shows service health only).
+  prometheusUrl: process.env.PROMETHEUS_URL || "",
+  // Panels for the homelab widget. Override with METRICS_PANELS (JSON array of
+  // {label, query, unit}). Defaults assume node_exporter + an NVIDIA exporter;
+  // adjust the queries to match your exporters.
+  metricsPanelsJson: process.env.METRICS_PANELS || "",
+
   // ── RAG / long-term memory (Qdrant + Ollama embeddings over the brain) ──────
   qdrantUrl: process.env.QDRANT_URL || "http://qdrant:6333",
   embedModel: process.env.EMBED_MODEL || "nomic-embed-text",
