@@ -90,8 +90,10 @@
   .caps { display: flex; flex-wrap: wrap; gap: 6px; }
   .cap {
     font-size: 11px; background: var(--panel2); border: 1px solid var(--border-hi); border-radius: 0;
-    padding: 4px 10px; color: var(--text); font-family: var(--mono); text-transform: lowercase;
+    padding: 4px 10px; color: var(--text); font-family: var(--mono); text-transform: lowercase; cursor: pointer;
+    transition: color .12s, border-color .12s;
   }
+  .cap:hover { color: var(--lime); border-color: var(--lime); }
   #graph { height: 260px; background: var(--panel2); border-top: 1px solid var(--border); }
   .hint { font-size: 10px; color: var(--muted); padding: 8px 14px 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; }
 
@@ -186,6 +188,15 @@
   .metric .rows { display: flex; flex-direction: column; gap: 5px; }
   .metric .row { display: grid; grid-template-columns: 64px 1fr 42px; align-items: center; gap: 8px; font-size: 11px; font-family: var(--mono); }
   .metric .row .rv { text-align: right; color: var(--muted); }
+  /* homelab: section labels + per-node resource bars (compact) */
+  .hl-lbl { font-size: 10px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+  .hl-div { border-top: 1px solid var(--border); margin: 12px 0 10px; }
+  .hl-node { margin-bottom: 9px; }
+  .hl-name { font-size: 11px; font-family: var(--mono); color: var(--text); margin-bottom: 4px; }
+  .hl-bars { display: flex; flex-direction: column; gap: 3px; }
+  .hl-b { display: grid; grid-template-columns: 38px 1fr 40px; align-items: center; gap: 8px; font-size: 10px; font-family: var(--mono); }
+  .hl-b .k { color: var(--muted); }
+  .hl-b .v { text-align: right; color: var(--muted); }
 
   /* ── Tasks (Linear) widget ── */
   .task { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--border); }
@@ -564,7 +575,14 @@ async function loadCaps() {
   try {
     const r = await (await fetch(API + "/tools")).json();
     const tools = r.tools || [];
-    $("caps").innerHTML = tools.map(t => '<span class="cap">' + esc(t.name) + "</span>").join("");
+    $("caps").innerHTML = tools.map(t => '<span class="cap" data-cmd="' + esc(t.name) + '" title="Insertar en el chat">' + esc(t.name) + "</span>").join("");
+    $("caps").querySelectorAll(".cap[data-cmd]").forEach((el) => el.onclick = () => {
+      const inp = $("input");
+      inp.value = "/" + el.dataset.cmd + " ";
+      inp.focus();
+      inp.style.height = "auto"; inp.style.height = inp.scrollHeight + "px";
+      closeAllDrawers(); // if opened from the mobile drawer, reveal the composer
+    });
   } catch {
     $("caps").innerHTML = '<span class="empty">—</span>';
   }
@@ -658,25 +676,42 @@ async function loadTasks() {
 }
 
 // ── Homelab / status widget ──
+const HL_ABBR = { "CPU": "CPU", "RAM": "RAM", "Disk /": "Disk", "GPU util": "GPU", "GPU mem": "VRAM" };
 async function loadHomelab() {
   try {
     const r = await (await fetch(API + "/widgets/homelab")).json();
     const svcs = r.services || [], panels = r.panels || [];
-    let html = '<div class="svc-grid">' + svcs.map((s) =>
-      '<div class="svc"><span class="d ' + (s.up ? "up" : "down") + '"></span><span class="n">' + esc(s.name) + '</span><span class="ms">' + (s.up ? s.ms + "ms" : "—") + "</span></div>"
+    // ── Top half: services (processes) ──
+    let html = '<div class="hl-lbl">Servicios · ' + svcs.filter(s => s.up).length + "/" + svcs.length + " activos</div>";
+    html += '<div class="svc-grid">' + svcs.map((s) =>
+      '<div class="svc"><span class="d ' + (s.up ? "up" : "down") + '"></span><span class="n">' + esc(s.name) + "</span></div>"
     ).join("") + "</div>";
-    if (r.metricsEnabled) {
-      for (const p of panels) {
-        if (p.error || !p.series || !p.series.length) continue;
-        html += '<div class="metric"><div class="lbl"><span>' + esc(p.label) + '</span></div><div class="rows">' +
-          p.series.map((s) => {
-            const v = Math.max(0, Math.min(100, s.value));
-            const warn = v >= 85 ? "warn" : "";
-            return '<div class="row"><span>' + esc(s.name) + '</span><span class="bar"><i class="' + warn + '" style="width:' + v + '%"></i></span><span class="rv">' + Math.round(s.value) + esc(p.unit || "") + "</span></div>";
-          }).join("") + "</div></div>";
-      }
+    html += '<div class="hl-div"></div>';
+    // ── Bottom half: resource chart, pivoted per node ──
+    html += '<div class="hl-lbl">Recursos</div>';
+    if (!r.metricsEnabled) {
+      html += '<div class="empty" style="font-size:12px">Configura PROMETHEUS_URL para ver CPU/RAM/GPU.</div>';
     } else {
-      html += '<div class="hint" style="padding:8px 0 0">Métricas: configura PROMETHEUS_URL</div>';
+      const nodes = {};
+      for (const p of panels) {
+        if (p.error) continue;
+        for (const s of (p.series || [])) (nodes[s.name] = nodes[s.name] || []).push({ label: p.label, value: s.value, unit: p.unit || "" });
+      }
+      const names = Object.keys(nodes);
+      if (!names.length) {
+        html += '<div class="empty" style="font-size:12px">Sin datos (revisa exporters / nombres de métricas).</div>';
+      } else {
+        for (const n of names) {
+          html += '<div class="hl-node"><div class="hl-name">' + esc(n) + '</div><div class="hl-bars">' +
+            nodes[n].map((m) => {
+              const v = Math.max(0, Math.min(100, m.value));
+              const warn = v >= 85 ? "warn" : "";
+              return '<div class="hl-b"><span class="k">' + esc(HL_ABBR[m.label] || m.label) + '</span>' +
+                '<span class="bar"><i class="' + warn + '" style="width:' + v + '%"></i></span>' +
+                '<span class="v">' + Math.round(m.value) + esc(m.unit || "") + "</span></div>";
+            }).join("") + "</div></div>";
+        }
+      }
     }
     $("homelab").innerHTML = html;
   } catch { $("homelab").innerHTML = '<span class="empty">Estado no disponible.</span>'; }
