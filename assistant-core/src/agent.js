@@ -4,11 +4,11 @@
 
 import { config } from "./config.js";
 import { runModel } from "./llm.js";
-import { routeFor } from "./router.js";
+import { routeFor, overrideChain } from "./router.js";
 import { llmTools, dispatch } from "./tools.js";
 import * as memory from "./memory.js";
 
-export async function runAgent({ sessionId, channel, userMessage, onEvent }) {
+export async function runAgent({ sessionId, channel, userMessage, onEvent, model }) {
   const emit = onEvent || (() => {});
   const ch = channel || "api";
 
@@ -28,11 +28,15 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent }) {
   const tools = llmTools(ch);
   let finalText = "";
 
-  // Task-specialized model routing: classify this turn once and build a failover
-  // chain (strong local → light local → Claude). When routing is off, pass no
-  // chain so llm.js keeps the legacy "Claude primary, Ollama fallback" behavior.
+  // Model selection. A manual override (from the dashboard dropdown) forces one
+  // model with no fallback (so you can test that exact model). Otherwise the
+  // task-specialized router classifies the turn and builds a failover chain.
   let chain;
-  if (config.modelRouting) {
+  const forced = overrideChain(model);
+  if (forced) {
+    chain = forced;
+    emit({ type: "route", category: "manual" });
+  } else if (config.modelRouting) {
     const route = routeFor(userMessage);
     chain = route.chain;
     emit({ type: "route", category: route.category });

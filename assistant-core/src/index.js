@@ -18,6 +18,7 @@ import { config } from "./config.js";
 import { migrate, hasDb } from "./db.js";
 import { loadManifest, watchManifest, listTools, dispatch } from "./tools.js";
 import { runAgent } from "./agent.js";
+import { listModels } from "./router.js";
 import * as memory from "./memory.js";
 import * as rag from "./rag.js";
 import { homelabPanels, metricsEnabled } from "./metrics.js";
@@ -77,6 +78,9 @@ app.get("/health", async () => ({
 }));
 
 app.get("/tools", async () => ({ tools: listTools() }));
+
+// Available models across hosts (for the manual model dropdown). Auto-discovered.
+app.get("/models", async () => ({ models: await listModels() }));
 
 // Invoke a tool directly (used by the dashboard's task widget and command palette).
 // Behind the auth gate like the rest of the dashboard API.
@@ -314,7 +318,7 @@ app.post("/voice/speak", async (req, reply) => {
 });
 
 app.post("/chat", async (req, reply) => {
-  const { session_id, message, channel } = req.body || {};
+  const { session_id, message, channel, model } = req.body || {};
   if (!session_id || !message) {
     return reply.code(400).send({ ok: false, error: "session_id and message are required" });
   }
@@ -322,12 +326,13 @@ app.post("/chat", async (req, reply) => {
     sessionId: session_id,
     channel: channel || "api",
     userMessage: message,
+    model,
   });
   return { ok: true, response };
 });
 
 app.post("/chat/stream", async (req, reply) => {
-  const { session_id, message, channel } = req.body || {};
+  const { session_id, message, channel, model } = req.body || {};
   if (!session_id || !message) {
     return reply.code(400).send({ ok: false, error: "session_id and message are required" });
   }
@@ -346,6 +351,7 @@ app.post("/chat/stream", async (req, reply) => {
       sessionId: session_id,
       channel: channel || "dashboard",
       userMessage: message,
+      model,
       onEvent: (e) => send(e.type, e),
     });
   } catch (err) {

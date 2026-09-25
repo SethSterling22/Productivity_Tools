@@ -59,6 +59,51 @@ export function classify(message) {
   return "general";
 }
 
+// ── Model discovery + manual override ───────────────────────────────────────
+// Remember the last models seen per host so we can still list them (greyed out)
+// when the host is temporarily offline.
+const seen = {};
+
+// List every model across the Ollama hosts (auto-discovered via /api/tags) plus
+// Claude. Each: { id, provider, host, model, available }. New models a host has
+// pulled show up automatically. id is what the client sends back to force a model.
+export async function listModels() {
+  const out = [];
+  if (config.anthropicKey) {
+    out.push({ id: "anthropic", provider: "anthropic", host: "claude", model: config.anthropicModel, available: true });
+  }
+  await Promise.all(
+    Object.entries(config.ollamaHosts).map(async ([host, url]) => {
+      let up = false, models = [];
+      try {
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), 1500);
+        const res = await fetch(`${url}/api/tags`, { signal: ctl.signal });
+        clearTimeout(t);
+        if (res.ok) { up = true; models = ((await res.json()).models || []).map((m) => m.name); }
+      } catch {}
+      if (up) seen[host] = models;
+      const known = up ? models : (seen[host] || []);
+      for (const m of known) out.push({ id: `${host}/${m}`, provider: "ollama", host, model: m, available: up });
+      if (!known.length) out.push({ id: `${host}/__offline`, provider: "ollama", host, model: "(sin modelos / offline)", available: false });
+    })
+  );
+  return out;
+}
+
+// Build a single-target chain to force a specific model (from the dropdown).
+// No auto-fallback: the point is to test that exact model's answer.
+export function overrideChain(id) {
+  if (!id || id === "auto") return null;
+  if (id === "anthropic") return config.anthropicKey ? [{ provider: "anthropic" }] : null;
+  const i = id.indexOf("/");
+  if (i === -1) return null;
+  const host = id.slice(0, i), model = id.slice(i + 1);
+  const url = config.ollamaHosts[host];
+  if (!url || model.startsWith("__")) return null;
+  return [{ provider: "ollama", host, url, model }];
+}
+
 // Returns { category, chain }. Chain is filtered to drop Claude when no API key,
 // and to drop Ollama hosts with no configured URL.
 export function routeFor(message) {

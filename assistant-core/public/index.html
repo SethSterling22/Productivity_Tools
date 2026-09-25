@@ -171,7 +171,13 @@
     max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .modelchip b { color: var(--lime); font-weight: 600; }
-  @media (max-width: 859px) { .modelchip { display: none; } }
+  .modelsel {
+    margin-left: 10px; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px; padding: 3px 6px; max-width: 200px; outline: none; cursor: pointer;
+  }
+  .modelsel:focus { border-color: var(--lime); }
+  .modelsel option:disabled { color: var(--muted); }
+  @media (max-width: 859px) { .modelchip, .modelsel { display: none; } }
 
   /* ── Homelab / status widget ── */
   .svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -241,6 +247,7 @@
       <h1>Rebeca</h1>
       <button id="convosToggle" title="Conversaciones" aria-label="Conversaciones">🗂</button>
       <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">conectando</span></div>
+      <select id="modelSelect" class="modelsel" title="Elegir modelo (Auto = el router decide)"><option value="auto">auto · router</option></select>
       <span class="modelchip" id="modelChip" title="Modelo usado en la última respuesta"></span>
       <button id="panelToggle" title="Panel" aria-label="Panel">☰</button>
     </div>
@@ -342,7 +349,7 @@ async function send(opts) {
     const res = await fetch(API + "/chat/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, message: text, channel: "dashboard" }),
+      body: JSON.stringify({ session_id: sessionId, message: text, channel: "dashboard", model: selectedModel !== "auto" ? selectedModel : undefined }),
     });
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -640,8 +647,9 @@ function newChat() {
   messages.innerHTML = "";
   addMsg("assistant", "Nueva conversación. ¿En qué te ayudo, Sebastian?");
 }
-// ── Model indicator (which model answered the last turn) ──
+// ── Model indicator + manual selector ──
 let lastRoute = "";
+let selectedModel = localStorage.getItem("rebeca_model") || "auto";
 function shortModel(m) { return String(m || "").replace(/^claude-/, "").replace(/-\d{6,}$/, ""); }
 function setModelChip(d) {
   if (!d) return;
@@ -649,6 +657,28 @@ function setModelChip(d) {
   const host = d.host ? " @" + d.host : "";
   $("modelChip").innerHTML = (lastRoute ? esc(lastRoute) + " · " : "") + "<b>" + esc(shortModel(model)) + "</b>" + esc(host);
 }
+// Populate the dropdown from /models (auto-discovered; unavailable ones greyed).
+async function loadModels() {
+  let models = [];
+  try { models = (await (await fetch(API + "/models")).json()).models || []; } catch {}
+  const groups = {};
+  for (const m of models) (groups[m.host] = groups[m.host] || []).push(m);
+  let html = '<option value="auto">auto · router</option>';
+  for (const host of Object.keys(groups)) {
+    html += '<optgroup label="' + esc(host) + '">';
+    for (const m of groups[host]) {
+      const lbl = m.provider === "anthropic" ? shortModel(m.model) : m.model;
+      html += '<option value="' + esc(m.id) + '"' + (m.available ? "" : " disabled") + ">" + esc(lbl) + (m.available ? "" : " — offline") + "</option>";
+    }
+    html += "</optgroup>";
+  }
+  const sel = $("modelSelect");
+  sel.innerHTML = html;
+  // keep the current choice if it's still available, else fall back to auto
+  if ([...sel.options].some((o) => o.value === selectedModel && !o.disabled)) sel.value = selectedModel;
+  else { selectedModel = "auto"; sel.value = "auto"; localStorage.setItem("rebeca_model", "auto"); }
+}
+$("modelSelect").onchange = (e) => { selectedModel = e.target.value; localStorage.setItem("rebeca_model", selectedModel); };
 
 // ── Generic tool invocation (task widget + command palette) ──
 async function invokeTool(name, input) {
@@ -790,10 +820,11 @@ document.addEventListener("keydown", (e) => {
 });
 
 loadHistory().then((had) => { if (!had) addMsg("assistant", "Hola Sebastian 👋 Soy Rebeca. ¿En qué te ayudo hoy?"); });
-loadHealth(); loadCalendar(); loadCaps(); loadGraph(); loadTasks(); loadHomelab();
+loadHealth(); loadCalendar(); loadCaps(); loadGraph(); loadTasks(); loadHomelab(); loadModels();
 setInterval(loadHealth, 30000);
 setInterval(loadCalendar, 300000); // keep upcoming events fresh (every 5 min)
 setInterval(loadHomelab, 30000);   // refresh homelab status
+setInterval(loadModels, 60000);    // refresh model availability
 </script>
 </body>
 </html>
