@@ -85,12 +85,35 @@ ollama pull qwen2.5-coder:7b    # coding                  (~4.7 GB)
 ollama pull qwen3:8b            # strong general (optional, ~5 GB)
 ```
 
-## Rollout
-1. Confirm omarchy VRAM.
-2. Pull the models above on the right hosts.
-3. Implement the router (heuristic classifier + routing table + failover) in
-   assistant-core; wire it into the agent's LLM adapter.
-4. Test each category routes to the expected host, and that omarchy-off falls back.
+## Rollout  ✅ IMPLEMENTED
+
+1. ✅ omarchy confirmed at 8 GB; models pulled on both hosts.
+2. ✅ Router implemented in assistant-core:
+   - `src/router.js` — `classify()` (heuristic categories) + `routeFor()` (failover
+     chain per category). Table = `DEFAULT_ROUTES`, override via `MODEL_ROUTES` env.
+   - `src/llm.js` — `runModel({..., chain})` tries targets in order, health-gates each
+     Ollama host (`GET /api/tags`, 1.5 s), and falls through (omarchy → sadida → Claude).
+   - `src/agent.js` — classifies the turn once, passes the chain, and emits `route`
+     (category) and `model` (provider/model/host) SSE events for transparency.
+3. Categories → chains are in the table above.
+
+### Config / tuning
+- `MODEL_ROUTING=on|off` (default on; off = legacy "Claude primary, Ollama fallback").
+- `OLLAMA_SADIDA_URL`, `OLLAMA_OMARCHY_URL` — host endpoints.
+- `MODEL_ROUTES` — JSON to override the table, e.g.
+  `{"coding":[{"host":"omarchy","model":"qwen2.5-coder:7b"},{"claude":true}]}`.
+
+### Deploy (code change → rebuild)
+```bash
+# workstation: git push origin main
+cd ~/Productivity_Tools/n8n && git pull
+sudo docker compose up -d --build --no-deps assistant-core
+```
+
+### Verify
+Ask something in each category and check `docker logs assistant_core` /the SSE `model`
+event shows the expected host+model; power off omarchy and confirm reasoning/coding
+fall back to sadida's light models, then to Claude.
 
 ## Sources
 - Small/fast models: <https://localaimaster.com/blog/small-language-models-guide-2026>, <https://benchlm.ai/best/ollama-models>

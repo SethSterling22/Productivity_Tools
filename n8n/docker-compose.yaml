@@ -166,6 +166,11 @@ services:
       - ASSISTANT_MODEL=${ASSISTANT_MODEL:-claude-sonnet-4-6}
       - OLLAMA_URL=http://sadida.stegosaurus-panga.ts.net:11434
       - ASSISTANT_FALLBACK_MODEL=${ASSISTANT_FALLBACK_MODEL:-qwen3.5:4b}
+      # Multi-model routing across Ollama hosts (sadida = light/always-on,
+      # omarchy = strong/when-on). Claude is the last-resort target.
+      - OLLAMA_SADIDA_URL=${OLLAMA_SADIDA_URL:-http://sadida.stegosaurus-panga.ts.net:11434}
+      - OLLAMA_OMARCHY_URL=${OLLAMA_OMARCHY_URL:-http://omarchy.stegosaurus-panga.ts.net:11434}
+      - MODEL_ROUTING=${MODEL_ROUTING:-on}
       # Tool backends (same netns, so localhost).
       - HERMES_URL=http://127.0.0.1:8080
       - N8N_WEBHOOK_BASE=http://127.0.0.1:5678/webhook

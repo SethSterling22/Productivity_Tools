@@ -14,16 +14,53 @@
 
 import { config } from "./config.js";
 
-export async function runModel({ system, messages, tools }) {
-  if (config.anthropicKey) {
+// Run the model. `chain` is an ordered list of targets from the router
+// (router.js): each is {provider:"anthropic"} or {provider:"ollama", url, model, host}.
+// We try them in order — Ollama hosts are health-gated so a powered-off host is
+// skipped fast — and return the first success. Without a chain we keep the legacy
+// behavior (Anthropic primary, then the default Ollama).
+export async function runModel({ system, messages, tools, chain }) {
+  if (!chain || !chain.length) {
+    chain = [];
+    if (config.anthropicKey) chain.push({ provider: "anthropic" });
+    chain.push({ provider: "ollama", url: config.ollamaUrl, model: config.ollamaModel });
+  }
+
+  let lastErr;
+  for (const t of chain) {
     try {
-      return await callAnthropic({ system, messages, tools });
+      if (t.provider === "anthropic") {
+        if (!config.anthropicKey) continue;
+        const r = await callAnthropic({ system, messages, tools });
+        return { ...r, model: config.anthropicModel };
+      }
+      // Ollama: skip the host quickly if it's not up (e.g. omarchy powered off).
+      const base = t.url || config.ollamaUrl;
+      if (!(await ollamaHealthy(base))) {
+        lastErr = new Error(`ollama host down: ${base}`);
+        continue;
+      }
+      const r = await callOllama({ system, messages, tools, baseUrl: base, model: t.model || config.ollamaModel });
+      return { ...r, model: t.model || config.ollamaModel, host: t.host };
     } catch (err) {
-      // Fall through to Ollama on any Anthropic failure.
-      console.error("[llm] Anthropic failed, falling back to Ollama:", err.message);
+      lastErr = err;
+      console.error(`[llm] target ${t.provider}/${t.model || ""} failed: ${err.message}`);
     }
   }
-  return await callOllama({ system, messages, tools });
+  throw lastErr || new Error("no LLM target available");
+}
+
+// Quick liveness check for an Ollama host (cheap GET /api/tags).
+async function ollamaHealthy(base) {
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 1500);
+    const res = await fetch(`${base}/api/tags`, { signal: ctl.signal });
+    clearTimeout(timer);
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 // ── Anthropic ────────────────────────────────────────────────────────────────
@@ -56,19 +93,21 @@ async function callAnthropic({ system, messages, tools }) {
   return { provider: "anthropic", text, toolCalls, stopReason: data.stop_reason };
 }
 
-// ── Ollama (fallback) ─────────────────────────────────────────────────────────
-async function callOllama({ system, messages, tools }) {
+// ── Ollama ──────────────────────────────────────────────────────────────────
+async function callOllama({ system, messages, tools, baseUrl, model }) {
+  const base = baseUrl || config.ollamaUrl;
+  const useModel = model || config.ollamaModel;
   const oMessages = [{ role: "system", content: system }, ...toOllamaMessages(messages)];
   const oTools = tools.map((t) => ({
     type: "function",
     function: { name: t.name, description: t.description, parameters: t.input_schema },
   }));
 
-  const res = await fetch(`${config.ollamaUrl}/api/chat`, {
+  const res = await fetch(`${base}/api/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      model: config.ollamaModel,
+      model: useModel,
       messages: oMessages,
       tools: oTools.length ? oTools : undefined,
       stream: false,
@@ -77,7 +116,7 @@ async function callOllama({ system, messages, tools }) {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Ollama ${res.status}: ${body.slice(0, 300)}`);
+    throw new Error(`Ollama ${res.status} (${useModel}@${base}): ${body.slice(0, 300)}`);
   }
   const data = await res.json();
   const msg = data.message || {};

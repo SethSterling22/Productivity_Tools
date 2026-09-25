@@ -28,6 +28,18 @@ export const config = {
   ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
   ollamaModel: process.env.ASSISTANT_FALLBACK_MODEL || "qwen3.5:4b",
 
+  // ── Multi-model routing ────────────────────────────────────────────────────
+  // Task-specialized routing across Ollama hosts, with Claude as last resort.
+  // Turn off with MODEL_ROUTING=off to fall back to "Claude primary, Ollama one".
+  modelRouting: process.env.MODEL_ROUTING !== "off",
+  // Ollama hosts by name. sadida = always-on light tier; omarchy = strong tier.
+  ollamaHosts: {
+    sadida: process.env.OLLAMA_SADIDA_URL || process.env.OLLAMA_URL || "http://sadida.stegosaurus-panga.ts.net:11434",
+    omarchy: process.env.OLLAMA_OMARCHY_URL || "http://omarchy.stegosaurus-panga.ts.net:11434",
+  },
+  // Optional JSON override of the category→chain table (see router.js DEFAULT_ROUTES).
+  modelRoutesJson: process.env.MODEL_ROUTES || "",
+
   // ── Tool backends ──────────────────────────────────────────────────────────
   hermesUrl: process.env.HERMES_URL || "http://127.0.0.1:8080",
   n8nWebhookBase: process.env.N8N_WEBHOOK_BASE || "http://127.0.0.1:5678/webhook",

@@ -4,6 +4,7 @@
 
 import { config } from "./config.js";
 import { runModel } from "./llm.js";
+import { routeFor } from "./router.js";
 import { llmTools, dispatch } from "./tools.js";
 import * as memory from "./memory.js";
 
@@ -27,6 +28,17 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent }) {
   const tools = llmTools(ch);
   let finalText = "";
 
+  // Task-specialized model routing: classify this turn once and build a failover
+  // chain (strong local → light local → Claude). When routing is off, pass no
+  // chain so llm.js keeps the legacy "Claude primary, Ollama fallback" behavior.
+  let chain;
+  if (config.modelRouting) {
+    const route = routeFor(userMessage);
+    chain = route.chain;
+    emit({ type: "route", category: route.category });
+  }
+  let announced = false;
+
   // Give the model the current date/time (LLMs don't know it) so it resolves
   // "today"/"tomorrow" correctly and emits ISO 8601 with the right date/offset.
   const nowStr = new Date().toLocaleString("es-PR", {
@@ -39,11 +51,18 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent }) {
     `Usa esto para resolver fechas relativas ("hoy", "mañana", "el viernes") y genera timestamps ISO 8601 con offset -04:00.`;
 
   for (let step = 0; step < config.maxAgentSteps; step++) {
-    const { text, toolCalls } = await runModel({
+    const { text, toolCalls, provider, model, host } = await runModel({
       system,
       messages,
       tools,
+      chain,
     });
+
+    // Announce which model actually answered (transparency for the dashboard).
+    if (!announced) {
+      announced = true;
+      emit({ type: "model", provider, model, host });
+    }
 
     if (toolCalls && toolCalls.length) {
       // Record the assistant turn (optional text + tool_use blocks).
