@@ -256,6 +256,34 @@
   .pal-field { padding: 10px 16px; border-bottom: 1px solid var(--border); }
   .pal-field label { display: block; font-size: 11px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; margin-bottom: 4px; }
   .pal-field input { border: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 13px; }
+
+  /* ── Task manager modal (expanded Linear view) ── */
+  #taskModalWrap { display: none; position: fixed; inset: 0; z-index: 85; background: rgba(0,0,0,.55); }
+  #taskModalWrap.show { display: block; }
+  .taskmodal { position: absolute; top: 8vh; left: 50%; transform: translateX(-50%); width: min(680px, 94vw); max-height: 84vh;
+    display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border-hi); box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .tm-head { display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
+  .tm-body { overflow-y: auto; padding: 8px 0; }
+  .tm-proj-h { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--lime); padding: 12px 16px 6px; }
+  .tm-task { border-bottom: 1px solid var(--border); }
+  .tm-task.sub .tm-row { padding-left: 34px; position: relative; }
+  .tm-task.sub .tm-row::before { content: "\21B3"; position: absolute; left: 18px; color: var(--muted); }
+  .tm-row { display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer; }
+  .tm-row:hover { background: rgba(188,191,86,.06); }
+  .tm-row .chk { width: 16px; height: 16px; flex: none; border: 1px solid var(--border-hi); background: var(--panel2); }
+  .tm-row .chk.on { background: var(--lime); }
+  .tm-row .tm-title { flex: 1; font-size: 13px; }
+  .tm-row .tm-state { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; }
+  .tm-editor { padding: 4px 16px 14px 16px; background: var(--panel2); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tm-editor .tm-field { display: flex; flex-direction: column; gap: 4px; }
+  .tm-editor .tm-field.full { grid-column: 1 / -1; }
+  .tm-editor label { font-size: 10px; font-family: var(--mono); text-transform: uppercase; color: var(--muted); }
+  .tm-editor input, .tm-editor select { background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 7px 9px; font: inherit; font-size: 13px; outline: none; }
+  .tm-editor input:focus, .tm-editor select:focus { border-color: var(--lime); }
+  .tm-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+  .tm-actions button { border: none; background: var(--lime); color: #0d0d0d; font-weight: 700; padding: 7px 14px; cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
+  .tm-actions a { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .tm-actions a:hover { color: var(--lime); }
 </style>
 </head>
 <body>
@@ -286,7 +314,12 @@
       <div class="body" id="calendar"><span class="empty">Cargando…</span></div>
     </div>
     <div class="card">
-      <h2>Tareas <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--muted);cursor:pointer" id="tasksReload" title="Actualizar">↻</span></h2>
+      <h2>Tareas
+        <span style="margin-left:auto;display:flex;gap:10px;font-family:var(--mono);font-size:12px;color:var(--muted)">
+          <span id="tasksExpand" title="Abrir gestor" style="cursor:pointer">⛶</span>
+          <span id="tasksReload" title="Actualizar" style="cursor:pointer">↻</span>
+        </span>
+      </h2>
       <div class="body" id="tasks"><span class="empty">Cargando…</span></div>
     </div>
     <div class="card">
@@ -320,6 +353,13 @@
       <input id="paletteInput" placeholder="Buscar acción…  (Esc para cerrar)" autocomplete="off" />
       <div class="pal-list" id="paletteList"></div>
       <div class="pal-hint">↑↓ navegar · Enter ejecutar · Esc cerrar</div>
+    </div>
+  </div>
+
+  <div id="taskModalWrap">
+    <div class="taskmodal" role="dialog" aria-label="Gestor de tareas">
+      <div class="tm-head"><span>Tareas · Linear</span><span id="tmReload" title="Actualizar" style="margin-left:auto;cursor:pointer">↻</span><span id="tmClose" title="Cerrar" style="margin-left:14px;cursor:pointer">✕</span></div>
+      <div class="tm-body" id="tmBody"></div>
     </div>
   </div>
 
@@ -814,6 +854,78 @@ async function loadHomelab() {
   } catch { $("homelab").innerHTML = '<span class="empty">Estado no disponible.</span>'; }
 }
 $("tasksReload").onclick = loadTasks;
+
+// ── Task manager (expanded, editable tree) ──
+let tmTasks = {};
+const TM_STATES = ["Backlog", "Todo", "In Progress", "Done", "Canceled"];
+const TM_PRIOS = [["3", "Normal"], ["1", "Urgente"], ["2", "Alta"], ["4", "Baja"], ["0", "Sin prioridad"]];
+function tmRow(t, isChild) {
+  tmTasks[t.id] = t;
+  const done = t.type === "completed";
+  return '<div class="tm-task' + (isChild ? " sub" : "") + '" data-id="' + esc(t.id) + '">' +
+    '<div class="tm-row">' +
+      '<span class="chk' + (done ? " on" : "") + '" data-act="toggle" title="Marcar hecha"></span>' +
+      '<span class="tm-title" data-act="edit">' + (t.ref ? '<b style="color:var(--muted);font-weight:400">' + esc(t.ref) + "</b> " : "") + esc(t.title) + "</span>" +
+      '<span class="tm-state">' + esc(t.state || "") + "</span>" +
+    '</div><div class="tm-editor" style="display:none"></div></div>';
+}
+function tmEditorHtml(t) {
+  const n = (s) => (s || "").toLowerCase();
+  const states = TM_STATES.map((s) => "<option" + (n(s) === n(t.state) ? " selected" : "") + ">" + s + "</option>").join("");
+  const prios = TM_PRIOS.map((p) => '<option value="' + p[0] + '"' + (String(t.priority) === p[0] ? " selected" : "") + ">" + p[1] + "</option>").join("");
+  return '<div class="tm-field full"><label>Título</label><input data-f="title" value="' + esc(t.title) + '"></div>' +
+    '<div class="tm-field"><label>Estado</label><select data-f="state">' + states + "</select></div>" +
+    '<div class="tm-field"><label>Prioridad</label><select data-f="priority">' + prios + "</select></div>" +
+    '<div class="tm-actions"><button data-act="save">Guardar</button>' +
+      (t.url ? '<a href="' + esc(t.url) + '" target="_blank" rel="noopener">Abrir en Linear ↗</a>' : "") +
+      '<span class="tm-msg" style="color:var(--muted);font-size:11px;font-family:var(--mono)"></span></div>';
+}
+async function renderTaskManager() {
+  tmTasks = {};
+  $("tmBody").innerHTML = '<div class="empty" style="padding:16px">Cargando…</div>';
+  let projects = [];
+  try { const r = await invokeTool("list_tasks", { limit: 100 }); projects = (r && r.projects) || []; } catch {}
+  if (!projects.length) { $("tmBody").innerHTML = '<div class="empty" style="padding:16px">Sin tareas.</div>'; return; }
+  let html = "";
+  for (const p of projects) {
+    html += '<div class="tm-proj"><div class="tm-proj-h">' + esc(p.name) + "</div>";
+    for (const t of p.tasks) { html += tmRow(t, false); for (const c of (t.children || [])) html += tmRow(c, true); }
+    html += "</div>";
+  }
+  $("tmBody").innerHTML = html;
+  $("tmBody").querySelectorAll(".tm-task").forEach((el) => {
+    const id = el.dataset.id, editor = el.querySelector(".tm-editor");
+    el.querySelector('[data-act="toggle"]').onclick = async (e) => {
+      e.stopPropagation();
+      await invokeTool("complete_task", { id, state: "Done" });
+      renderTaskManager(); loadTasks();
+    };
+    el.querySelector('[data-act="edit"]').onclick = () => {
+      const open = editor.style.display !== "none";
+      $("tmBody").querySelectorAll(".tm-editor").forEach((x) => x.style.display = "none");
+      if (open) return;
+      editor.innerHTML = tmEditorHtml(tmTasks[id]);
+      editor.style.display = "grid";
+      editor.querySelector('[data-act="save"]').onclick = async () => {
+        const title = editor.querySelector('[data-f="title"]').value.trim();
+        const priority = parseInt(editor.querySelector('[data-f="priority"]').value, 10);
+        const state = editor.querySelector('[data-f="state"]').value;
+        const msg = editor.querySelector(".tm-msg"); msg.textContent = "Guardando…";
+        try {
+          await invokeTool("update_task", { id, title, priority });
+          if (state && state.toLowerCase() !== String(tmTasks[id].state || "").toLowerCase()) await invokeTool("complete_task", { id, state });
+          msg.textContent = "✓ guardado";
+          setTimeout(() => { renderTaskManager(); loadTasks(); }, 500);
+        } catch { msg.textContent = "⚠ error"; }
+      };
+    };
+  });
+}
+$("tasksExpand").onclick = () => { $("taskModalWrap").classList.add("show"); renderTaskManager(); };
+$("tmClose").onclick = () => $("taskModalWrap").classList.remove("show");
+$("tmReload").onclick = renderTaskManager;
+$("taskModalWrap").onclick = (e) => { if (e.target.id === "taskModalWrap") $("taskModalWrap").classList.remove("show"); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("taskModalWrap").classList.remove("show"); });
 
 // ── Command palette (Ctrl-K / Cmd-K): fire any tool without typing a prompt ──
 let palTools = [], palFiltered = [], palSel = 0, palMode = null;
