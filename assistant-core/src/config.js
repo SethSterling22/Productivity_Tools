@@ -21,7 +21,7 @@ export const config = {
 
   // ── LLM: Anthropic primary, Ollama fallback ────────────────────────────────
   anthropicKey: process.env.ANTHROPIC_API_KEY || "",
-  anthropicModel: process.env.ASSISTANT_MODEL || "claude-sonnet-4-6",
+  anthropicModel: process.env.ASSISTANT_MODEL || "claude-sonnet-5",
   anthropicVersion: process.env.ANTHROPIC_VERSION || "2023-06-01",
   maxTokens: Number(process.env.ASSISTANT_MAX_TOKENS || 1024),
 
