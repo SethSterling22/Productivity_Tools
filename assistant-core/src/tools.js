@@ -25,7 +25,18 @@ async function createPlan(input) {
   const title = (input.title || "").trim();
   if (!title) return { ok: false, error: "Missing 'title' (the plan/goal)." };
   const subs = Array.isArray(input.subtasks) ? input.subtasks : [];
-  const parent = await dispatch("create_task", { title, description: input.description, project: input.project });
+
+  // Resolve the project: use an existing id, or create one from `new_project`.
+  let projectId = input.project || null;
+  let projectInfo = null;
+  if (!projectId && input.new_project) {
+    const pr = await dispatch("create_project", { name: String(input.new_project), description: input.description });
+    if (!pr || pr.ok === false || !pr.id) return { ok: false, error: "Could not create the project.", detail: pr };
+    projectId = pr.id;
+    projectInfo = { name: pr.name, url: pr.url };
+  }
+
+  const parent = await dispatch("create_task", { title, description: input.description, project: projectId });
   if (!parent || parent.ok === false || !parent.id) {
     return { ok: false, error: "Could not create the parent task.", detail: parent };
   }
@@ -36,14 +47,15 @@ async function createPlan(input) {
     const c = await dispatch("create_task", {
       title: String(stitle),
       description: typeof s === "object" ? s.description : undefined,
-      project: input.project,
+      project: projectId,
       parent: parent.id,
     });
     children.push(c && c.ok !== false ? { ref: c.identifier, title: c.title, url: c.url } : { error: true, title: String(stitle) });
   }
   return {
     ok: true,
-    result: `Plan creado: ${parent.identifier || ""} ${parent.title} con ${children.length} subtarea(s).`,
+    result: `Plan creado${projectInfo ? ` en el proyecto "${projectInfo.name}"` : ""}: ${parent.identifier || ""} ${parent.title} con ${children.length} subtarea(s).`,
+    project: projectInfo,
     parent: { ref: parent.identifier, title: parent.title, url: parent.url, id: parent.id },
     children,
   };

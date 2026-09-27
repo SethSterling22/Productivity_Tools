@@ -44,8 +44,28 @@
     },
 
     {
+      "parameters": { "httpMethod": "POST", "path": "tool/create_project", "responseMode": "lastNode", "options": {} },
+      "id": "cp-webhook", "name": "create_project · Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [240, 420], "webhookId": "tool-create-project"
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={{ (() => { const b = $json.body || {}; const LINEAR_TEAM_ID = 'REPLACE_WITH_LINEAR_TEAM_UUID'; const input = { name: String(b.name || 'Nuevo proyecto').slice(0,200), description: String(b.description || ''), teamIds: [LINEAR_TEAM_ID] }; return JSON.stringify({ query: 'mutation($input:ProjectCreateInput!){ projectCreate(input:$input){ success project{ id name url } } }', variables: { input } }); })() }}",
+        "options": {}
+      },
+      "id": "cp-http", "name": "Linear — create project", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [460, 420],
+      "credentials": { "httpHeaderAuth": { "id": "9DsrffbpiAKa8uGY", "name": "Header Auth - Linear" } }
+    },
+    {
+      "parameters": { "jsCode": "const res = (($json.data||{}).projectCreate)||{};\nif (!res.success || !res.project) return [{ json: { ok:false, error:'Linear did not create the project', raw:$json } }];\nconst p = res.project;\nreturn [{ json: { ok:true, id:p.id, name:p.name, url:p.url, result:`Project created: ${p.name}` } }];" },
+      "id": "cp-shape", "name": "Shape project", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [680, 420]
+    },
+    {
       "parameters": { "httpMethod": "POST", "path": "tool/update_task", "responseMode": "lastNode", "options": {} },
-      "id": "ut-webhook", "name": "update_task · Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [240, 440], "webhookId": "tool-update-task"
+      "id": "ut-webhook", "name": "update_task · Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [240, 580], "webhookId": "tool-update-task"
     },
     {
       "parameters": {
@@ -107,6 +127,9 @@
 
     "list_projects · Webhook": { "main": [[{ "node": "Linear — projects", "type": "main", "index": 0 }]] },
     "Linear — projects": { "main": [[{ "node": "Shape projects", "type": "main", "index": 0 }]] },
+
+    "create_project · Webhook": { "main": [[{ "node": "Linear — create project", "type": "main", "index": 0 }]] },
+    "Linear — create project": { "main": [[{ "node": "Shape project", "type": "main", "index": 0 }]] },
 
     "update_task · Webhook": { "main": [[{ "node": "Linear — update", "type": "main", "index": 0 }]] },
     "Linear — update": { "main": [[{ "node": "Shape update", "type": "main", "index": 0 }]] },

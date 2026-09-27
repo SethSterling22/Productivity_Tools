@@ -21,13 +21,14 @@
     },
     {
       "name": "create_plan",
-      "description": "Plan a goal by creating a parent task plus its subtasks in Linear in one step. Use when the user wants to 'planificar', break a goal into steps, or create a task that has several subtasks at once. Provide the parent 'title' and a 'subtasks' array of titles; optionally a 'project' id to file the whole plan under.",
+      "description": "Plan a goal by creating a parent task plus its subtasks in Linear in one step. Use when the user wants to 'planificar', break a goal into steps, or create a task that has several subtasks at once. Provide the parent 'title' and a 'subtasks' array of titles. To file the plan under a project: pass an existing project id as 'project', OR pass 'new_project' with a name to create a new project for it.",
       "input_schema": {
         "type": "object",
         "properties": {
           "title": { "type": "string", "description": "The plan/goal = the parent task title." },
           "description": { "type": "string", "description": "Optional details for the parent." },
-          "project": { "type": "string", "description": "Optional Linear project id for the whole plan (from list_projects)." },
+          "project": { "type": "string", "description": "Optional EXISTING Linear project id (from list_projects)." },
+          "new_project": { "type": "string", "description": "Optional NAME of a new project to create and file the whole plan under." },
           "subtasks": { "type": "array", "items": { "type": "string" }, "description": "Subtask titles; each becomes a child issue under the parent." }
         },
         "required": ["title", "subtasks"]
@@ -36,6 +37,22 @@
       "channels": ["dashboard", "telegram"],
       "category": "Linear",
       "icon": "list-tree"
+    },
+    {
+      "name": "create_project",
+      "description": "Create a new project in Linear. Use when the user wants a new project to organize tasks under. Returns the project id, name and url.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Project name." },
+          "description": { "type": "string", "description": "Optional project description." }
+        },
+        "required": ["name"]
+      },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/create_project" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Linear",
+      "icon": "folder-plus"
     },
     {
       "name": "list_tasks",
