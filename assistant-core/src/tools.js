@@ -16,7 +16,38 @@ const BUILTINS = {
   search_brain_semantic: (input) => rag.searchBrain(input || {}),
   web_search: (input) => webSearch(input || {}),
   query_metrics: (input) => queryMetrics(input || {}),
+  create_plan: (input) => createPlan(input || {}),
 };
+
+// Planning: create a parent task plus its subtasks in one step, reusing the
+// create_task tool (which returns the Linear issue id we use as the parent).
+async function createPlan(input) {
+  const title = (input.title || "").trim();
+  if (!title) return { ok: false, error: "Missing 'title' (the plan/goal)." };
+  const subs = Array.isArray(input.subtasks) ? input.subtasks : [];
+  const parent = await dispatch("create_task", { title, description: input.description, project: input.project });
+  if (!parent || parent.ok === false || !parent.id) {
+    return { ok: false, error: "Could not create the parent task.", detail: parent };
+  }
+  const children = [];
+  for (const s of subs) {
+    const stitle = typeof s === "string" ? s : (s && s.title);
+    if (!stitle) continue;
+    const c = await dispatch("create_task", {
+      title: String(stitle),
+      description: typeof s === "object" ? s.description : undefined,
+      project: input.project,
+      parent: parent.id,
+    });
+    children.push(c && c.ok !== false ? { ref: c.identifier, title: c.title, url: c.url } : { error: true, title: String(stitle) });
+  }
+  return {
+    ok: true,
+    result: `Plan creado: ${parent.identifier || ""} ${parent.title} con ${children.length} subtarea(s).`,
+    parent: { ref: parent.identifier, title: parent.title, url: parent.url, id: parent.id },
+    children,
+  };
+}
 
 let manifest = { version: 0, tools: [] };
 let byName = new Map();
