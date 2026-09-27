@@ -6,6 +6,8 @@
 <title>REBECA</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <script src="https://cdn.jsdelivr.net/npm/force-graph@1.43.5/dist/force-graph.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.11/purify.min.js"></script>
 <style>
   :root {
     --bg: #0d0d0d; --panel: #151515; --panel2: #0f0f0f;
@@ -49,6 +51,24 @@
   .msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-left: 2px solid var(--lime); }
   .msg a { color: var(--lime); text-underline-offset: 2px; }
   .msg.user a { color: #0d0d0d; }
+  /* Rendered markdown inside assistant messages */
+  .msg.assistant { white-space: normal; }
+  .msg.assistant p { margin: 6px 0; white-space: pre-wrap; }
+  .msg.assistant p:first-child { margin-top: 0; } .msg.assistant p:last-child { margin-bottom: 0; }
+  .msg.assistant strong { color: #fff; }
+  .msg.assistant h1, .msg.assistant h2, .msg.assistant h3, .msg.assistant h4 { margin: 12px 0 6px; line-height: 1.25; }
+  .msg.assistant h1 { font-size: 18px; } .msg.assistant h2 { font-size: 16px; }
+  .msg.assistant h3 { font-size: 14px; } .msg.assistant h4 { font-size: 13px; color: var(--muted); }
+  .msg.assistant ul, .msg.assistant ol { margin: 6px 0; padding-left: 20px; }
+  .msg.assistant li { margin: 2px 0; }
+  .msg.assistant code { background: var(--panel2); border: 1px solid var(--border); padding: 1px 5px; font-family: var(--mono); font-size: 12px; }
+  .msg.assistant pre { background: var(--panel2); border: 1px solid var(--border); padding: 10px 12px; overflow-x: auto; margin: 8px 0; }
+  .msg.assistant pre code { border: none; padding: 0; background: none; }
+  .msg.assistant blockquote { border-left: 2px solid var(--olive); margin: 8px 0; padding-left: 10px; color: var(--muted); }
+  .msg.assistant hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+  .msg.assistant table { border-collapse: collapse; margin: 8px 0; font-size: 13px; display: block; overflow-x: auto; }
+  .msg.assistant th, .msg.assistant td { border: 1px solid var(--border-hi); padding: 5px 9px; text-align: left; }
+  .msg.assistant th { background: var(--panel2); color: var(--lime); font-weight: 600; white-space: nowrap; }
   .tool {
     align-self: flex-start; font-size: 11px; color: var(--muted); background: var(--panel2);
     border: 1px solid var(--border); padding: 4px 10px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .5px;
@@ -388,11 +408,23 @@ const messages = $("messages");
 
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function linkify(s) { return esc(s).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
+// Render assistant markdown (tables, bold, headers, code…) safely; fall back to
+// plain linkified text if the libraries didn't load.
+function renderMd(text) {
+  try {
+    if (window.marked && window.DOMPurify) {
+      return DOMPurify.sanitize(marked.parse(String(text || ""), { gfm: true, breaks: true }));
+    }
+  } catch (e) {}
+  return linkify(text);
+}
+function fixLinks(el) { el.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener"; }); }
 
 function addMsg(role, text) {
   const el = document.createElement("div");
   el.className = "msg " + role;
-  el.innerHTML = linkify(text);
+  if (role === "assistant") { el.innerHTML = renderMd(text); fixLinks(el); }
+  else el.innerHTML = linkify(text);
   messages.appendChild(el);
   messages.scrollTop = messages.scrollHeight;
   return el;
@@ -447,7 +479,7 @@ async function send(opts) {
           else if (event === "tool_result") addTool(data.name, "✓ resultado de");
           else if (event === "route") lastRoute = data.category;
           else if (event === "model") onModelUsed(data);
-          else if (event === "text") { if (data.text) { finalText = data.text; if (!asstEl) asstEl = addMsg("assistant", ""); asstEl.innerHTML = linkify(data.text); messages.scrollTop = messages.scrollHeight; } }
+          else if (event === "text") { if (data.text) { finalText = data.text; if (!asstEl) asstEl = addMsg("assistant", ""); asstEl.innerHTML = renderMd(data.text); fixLinks(asstEl); messages.scrollTop = messages.scrollHeight; } }
           else if (event === "error") addMsg("assistant", "⚠ " + (data.message || "error"));
         }
       }
