@@ -1,0 +1,46 @@
+{
+  "name": "Linear — whoami (get user id)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "wa-trigger",
+      "name": "Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: '{ viewer { id name email } }' }) }}",
+        "options": {}
+      },
+      "id": "wa-http",
+      "name": "Linear — viewer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "credentials": { "httpHeaderAuth": { "id": "9DsrffbpiAKa8uGY", "name": "Header Auth - Linear" } }
+    },
+    {
+      "parameters": { "jsCode": "const v = (($json.data)||{}).viewer || {};\nreturn [{ json: { user_id: v.id, name: v.name, email: v.email, paste_this_into_LINEAR_ASSIGNEE_ID: v.id } }];" },
+      "id": "wa-shape",
+      "name": "Your user id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Run": { "main": [[{ "node": "Linear — viewer", "type": "main", "index": 0 }]] },
+    "Linear — viewer": { "main": [[{ "node": "Your user id", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

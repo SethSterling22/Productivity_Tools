@@ -105,7 +105,7 @@ export const config = {
   manifestPath: process.env.TOOLS_MANIFEST || path.join(__dirname, "..", "tools.manifest.json"),
 
   // Max tool-calling iterations per user turn (guards against loops).
-  maxAgentSteps: Number(process.env.MAX_AGENT_STEPS || 6),
+  maxAgentSteps: Number(process.env.MAX_AGENT_STEPS || 8),
 
   systemPrompt:
     process.env.ASSISTANT_SYSTEM_PROMPT ||
@@ -115,6 +115,8 @@ export const config = {
       "You have context on his k3s home lab (Sadida, Ocra, Sram, Xelor, Sacro, Aery).",
       "Be direct, concise and technical. Respond in the user's language (usually Spanish).",
       "Use the provided tools when the user wants to create/read/update something. Ask a brief clarifying question if a required detail is missing.",
+      "For planning requests, call create_plan ONCE with the parent title and the full list of subtasks — it creates the parent and all subtasks in a single step. Do NOT also call create_task for the same items (that duplicates them), and do NOT call list_tasks to verify. After it returns, end your turn with a short confirmation summarizing the parent and the subtasks created.",
+      "Never repeat a creation tool call for something you already created in this turn. Always finish with a brief natural-language confirmation of what you did.",
       "The user's timezone is America/Puerto_Rico (UTC-04:00, no DST).",
     ].join(" "),
 };

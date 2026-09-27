@@ -48,10 +48,14 @@ const ROUTES = loadRoutes();
 const CODE_RE = /```|\b(bug|error|stack ?trace|traceback|exception|compile|deploy|refactor|regex|docker|kubernetes|k8s|terraform|ansible|sql|query|endpoint|api|función|funcion|function|script|clase|class|import|npm|pip|git|yaml|json|bash|shell|nginx)\b|\b(python|javascript|typescript|node|java|golang|rust|c\+\+|c#|php|ruby|kotlin|swift)\b/i;
 const REASON_RE = /\b(por ?qué|porque|calcula|cálculo|calculo|demuestra|demostrar|resuelve|resolver|razona|razonamiento|analiza|análisis|analisis|compara|comparación|estrategia|optimiza|prueba matemática|paso a paso|step ?by ?step|prove|proof|derive|reason|logic|lógica|logica|math|matemática|matematica|ecuación|ecuacion)\b/i;
 const GREET_RE = /^(hola+|hey|buenas|buenos días|buenos dias|buenas tardes|buenas noches|qué tal|que tal|cómo estás|como estas|gracias|muchas gracias|ok|okay|vale|perfecto|genial|adiós|adios|chao|hi|hello|thanks|thank you)[\s!.,]*$/i;
+// Planning / multi-step decomposition benefits from the strongest model (Claude):
+// it must produce a clean parent + subtasks and a confirmation in one pass.
+const PLAN_RE = /\b(planifi\w+|planea\w*|plan de|haz un plan|hagamos un plan|desglos\w+|divide (esto )?en (tareas|pasos|subtareas)|hoja de ruta|roadmap|breakdown|organiza\w* (un|el) proyecto)\b/i;
 
 export function classify(message) {
   const m = (message || "").trim();
   const len = m.length;
+  if (PLAN_RE.test(m)) return "complex";     // planning -> Claude first
   if (CODE_RE.test(m)) return "coding";
   if (REASON_RE.test(m)) return "reasoning";
   if (len > 800) return "complex";           // long, likely needs the strongest model
