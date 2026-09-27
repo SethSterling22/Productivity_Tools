@@ -88,7 +88,9 @@
   a.cal-item:hover { background: rgba(188, 191, 86, .10); }
   .cal-item .t { color: var(--lime); font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 92px; font-size: 12px; line-height: 1.35; }
   .empty { color: var(--muted); font-style: italic; }
-  .caps { display: flex; flex-wrap: wrap; gap: 6px; }
+  .caps { display: flex; flex-direction: column; gap: 10px; }
+  .cap-cat { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 5px; }
+  .caps-row { display: flex; flex-wrap: wrap; gap: 6px; }
   .cap {
     font-size: 11px; background: var(--panel2); border: 1px solid var(--border-hi); border-radius: 0;
     padding: 4px 10px; color: var(--text); font-family: var(--mono); text-transform: lowercase; cursor: pointer;
@@ -649,13 +651,25 @@ async function loadCaps() {
   try {
     const r = await (await fetch(API + "/tools")).json();
     const tools = r.tools || [];
-    $("caps").innerHTML = tools.map(t => '<span class="cap" data-cmd="' + esc(t.name) + '" title="Insertar en el chat">' + esc(t.name) + "</span>").join("");
+    // Group by category (falls back to "Otros" when a tool has none).
+    const groups = {};
+    for (const t of tools) (groups[t.category || "Otros"] = groups[t.category || "Otros"] || []).push(t);
+    const order = ["Linear", "Calendario", "Notas / Brain", "Web", "Homelab", "Otros"];
+    const names = Object.keys(groups).sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    $("caps").innerHTML = names.map((cat) =>
+      '<div class="cap-group"><div class="cap-cat">' + esc(cat) + "</div><div class=\"caps-row\">" +
+      groups[cat].map((t) => '<span class="cap" data-cmd="' + esc(t.name) + '" title="Insertar en el chat">' + esc(t.name) + "</span>").join("") +
+      "</div></div>"
+    ).join("");
     $("caps").querySelectorAll(".cap[data-cmd]").forEach((el) => el.onclick = () => {
       const inp = $("input");
       inp.value = "/" + el.dataset.cmd + " ";
       inp.focus();
       inp.style.height = "auto"; inp.style.height = inp.scrollHeight + "px";
-      closeAllDrawers(); // if opened from the mobile drawer, reveal the composer
+      closeAllDrawers();
     });
   } catch {
     $("caps").innerHTML = '<span class="empty">—</span>';

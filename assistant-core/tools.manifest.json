@@ -16,109 +16,26 @@
       },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/create_task" },
       "channels": ["dashboard", "telegram"],
+      "category": "Linear",
       "icon": "check-square"
     },
     {
-      "name": "create_event",
-      "description": "Create a Google Calendar event. Provide ISO 8601 start/end with the -04:00 (America/Puerto_Rico) offset.",
+      "name": "create_plan",
+      "description": "Plan a goal by creating a parent task plus its subtasks in Linear in one step. Use when the user wants to 'planificar', break a goal into steps, or create a task that has several subtasks at once. Provide the parent 'title' and a 'subtasks' array of titles; optionally a 'project' id to file the whole plan under.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "start": { "type": "string", "description": "ISO 8601 start, e.g. 2026-08-18T15:00:00-04:00" },
-          "end": { "type": "string", "description": "ISO 8601 end. If omitted, defaults to 1h after start." },
-          "description": { "type": "string" }
+          "title": { "type": "string", "description": "The plan/goal = the parent task title." },
+          "description": { "type": "string", "description": "Optional details for the parent." },
+          "project": { "type": "string", "description": "Optional Linear project id for the whole plan (from list_projects)." },
+          "subtasks": { "type": "array", "items": { "type": "string" }, "description": "Subtask titles; each becomes a child issue under the parent." }
         },
-        "required": ["title", "start"]
+        "required": ["title", "subtasks"]
       },
-      "endpoint": { "type": "n8n_webhook", "path": "/tool/create_event" },
+      "endpoint": { "type": "builtin", "name": "create_plan" },
       "channels": ["dashboard", "telegram"],
-      "icon": "calendar-plus"
-    },
-    {
-      "name": "list_today_events",
-      "description": "List the user's upcoming Google Calendar events (from now through the next 7 days), sorted, with date and time.",
-      "input_schema": { "type": "object", "properties": {} },
-      "endpoint": { "type": "n8n_webhook", "path": "/tool/list_today_events" },
-      "channels": ["dashboard", "telegram"],
-      "icon": "calendar"
-    },
-    {
-      "name": "save_note",
-      "description": "Save a note to the second brain (git-backed vault). Use @folder to route and #tags to label.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "title": { "type": "string" },
-          "content": { "type": "string" },
-          "folder": { "type": "string", "description": "Target folder, defaults to Inbox." },
-          "tags": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["content"]
-      },
-      "endpoint": { "type": "hermes_tool", "path": "/tool/note_save" },
-      "channels": ["dashboard", "telegram"],
-      "icon": "file-plus"
-    },
-    {
-      "name": "search_brain",
-      "description": "Browse the second brain: return the folder/note tree, optionally within a subfolder.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "subdir": { "type": "string", "description": "Optional subfolder to list." },
-          "depth": { "type": "integer", "description": "Tree depth (default 3)." }
-        }
-      },
-      "endpoint": { "type": "hermes_tool", "path": "/tool/brain_list" },
-      "channels": ["dashboard", "telegram"],
-      "icon": "folder-tree"
-    },
-    {
-      "name": "search_brain_semantic",
-      "description": "Search the user's second brain by meaning (semantic/RAG) to answer questions grounded in their own notes, e.g. 'what did I decide about the Ocra ingress?'. Returns the most relevant note excerpts with links. Prefer this over search_brain when answering a question from the notes.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "query": { "type": "string", "description": "What to look for, in natural language." },
-          "limit": { "type": "integer", "description": "Max results (default 5)." }
-        },
-        "required": ["query"]
-      },
-      "endpoint": { "type": "builtin", "name": "search_brain_semantic" },
-      "channels": ["dashboard", "telegram"],
-      "icon": "search"
-    },
-    {
-      "name": "web_search",
-      "description": "Search the public web for current, real-world information the model cannot know from memory: weather, news, prices, sports scores, recent events, product/library docs, 'what is the latest ...'. Returns titles, URLs and snippets (and an instant answer when available). Use this whenever the answer depends on up-to-date facts. Do NOT use it for the user's own notes (use search_brain_semantic) or personal data.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "query": { "type": "string", "description": "The search query, in natural language." },
-          "limit": { "type": "integer", "description": "Max results, 1-10 (default 5)." },
-          "categories": { "type": "string", "description": "Optional SearXNG category, e.g. 'news' for recent news, 'general' (default)." },
-          "time_range": { "type": "string", "description": "Optional recency filter: day, week, month, or year." }
-        },
-        "required": ["query"]
-      },
-      "endpoint": { "type": "builtin", "name": "web_search" },
-      "channels": ["dashboard", "telegram"],
-      "icon": "globe"
-    },
-    {
-      "name": "query_metrics",
-      "description": "Query the homelab's Prometheus with a PromQL expression to read live metrics (CPU, RAM, disk, GPU utilization/memory, service up/down). Use when the user asks about the state or health of the homelab or a node, or when a decision depends on current resource usage (e.g. 'is the GPU free?', 'how full is Ocra's disk?', 'which node is under load?'). Returns matching series with labels and values.",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "query": { "type": "string", "description": "A PromQL expression, e.g. 'DCGM_FI_DEV_GPU_UTIL', 'node_filesystem_avail_bytes{mountpoint=\"/\"}', or 'up'." }
-        },
-        "required": ["query"]
-      },
-      "endpoint": { "type": "builtin", "name": "query_metrics" },
-      "channels": ["dashboard", "telegram"],
-      "icon": "activity"
+      "category": "Linear",
+      "icon": "list-tree"
     },
     {
       "name": "list_tasks",
@@ -132,6 +49,7 @@
       },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/list_tasks" },
       "channels": ["dashboard", "telegram"],
+      "category": "Linear",
       "icon": "list-checks"
     },
     {
@@ -140,6 +58,7 @@
       "input_schema": { "type": "object", "properties": {} },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/list_projects" },
       "channels": ["dashboard", "telegram"],
+      "category": "Linear",
       "icon": "folder"
     },
     {
@@ -158,6 +77,7 @@
       },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/update_task" },
       "channels": ["dashboard", "telegram"],
+      "category": "Linear",
       "icon": "edit"
     },
     {
@@ -173,7 +93,117 @@
       },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/complete_task" },
       "channels": ["dashboard", "telegram"],
+      "category": "Linear",
       "icon": "check-circle"
+    },
+    {
+      "name": "create_event",
+      "description": "Create a Google Calendar event. Provide ISO 8601 start/end with the -04:00 (America/Puerto_Rico) offset.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "start": { "type": "string", "description": "ISO 8601 start, e.g. 2026-08-18T15:00:00-04:00" },
+          "end": { "type": "string", "description": "ISO 8601 end. If omitted, defaults to 1h after start." },
+          "description": { "type": "string" }
+        },
+        "required": ["title", "start"]
+      },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/create_event" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Calendario",
+      "icon": "calendar-plus"
+    },
+    {
+      "name": "list_today_events",
+      "description": "List the user's upcoming Google Calendar events (from now through the next 7 days), sorted, with date and time.",
+      "input_schema": { "type": "object", "properties": {} },
+      "endpoint": { "type": "n8n_webhook", "path": "/tool/list_today_events" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Calendario",
+      "icon": "calendar"
+    },
+    {
+      "name": "save_note",
+      "description": "Save a note to the second brain (git-backed vault). Use @folder to route and #tags to label.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "folder": { "type": "string", "description": "Target folder, defaults to Inbox." },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["content"]
+      },
+      "endpoint": { "type": "hermes_tool", "path": "/tool/note_save" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Notas / Brain",
+      "icon": "file-plus"
+    },
+    {
+      "name": "search_brain",
+      "description": "Browse the second brain: return the folder/note tree, optionally within a subfolder.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "subdir": { "type": "string", "description": "Optional subfolder to list." },
+          "depth": { "type": "integer", "description": "Tree depth (default 3)." }
+        }
+      },
+      "endpoint": { "type": "hermes_tool", "path": "/tool/brain_list" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Notas / Brain",
+      "icon": "folder-tree"
+    },
+    {
+      "name": "search_brain_semantic",
+      "description": "Search the user's second brain by meaning (semantic/RAG) to answer questions grounded in their own notes, e.g. 'what did I decide about the Ocra ingress?'. Returns the most relevant note excerpts with links. Prefer this over search_brain when answering a question from the notes.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "What to look for, in natural language." },
+          "limit": { "type": "integer", "description": "Max results (default 5)." }
+        },
+        "required": ["query"]
+      },
+      "endpoint": { "type": "builtin", "name": "search_brain_semantic" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Notas / Brain",
+      "icon": "search"
+    },
+    {
+      "name": "web_search",
+      "description": "Search the public web for current, real-world information the model cannot know from memory: weather, news, prices, sports scores, recent events, product/library docs, 'what is the latest ...'. Returns titles, URLs and snippets (and an instant answer when available). Use this whenever the answer depends on up-to-date facts. Do NOT use it for the user's own notes (use search_brain_semantic) or personal data.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "The search query, in natural language." },
+          "limit": { "type": "integer", "description": "Max results, 1-10 (default 5)." },
+          "categories": { "type": "string", "description": "Optional SearXNG category, e.g. 'news' for recent news, 'general' (default)." },
+          "time_range": { "type": "string", "description": "Optional recency filter: day, week, month, or year." }
+        },
+        "required": ["query"]
+      },
+      "endpoint": { "type": "builtin", "name": "web_search" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Web",
+      "icon": "globe"
+    },
+    {
+      "name": "query_metrics",
+      "description": "Query the homelab's Prometheus with a PromQL expression to read live metrics (CPU, RAM, disk, GPU utilization/memory, service up/down). Use when the user asks about the state or health of the homelab or a node, or when a decision depends on current resource usage (e.g. 'is the GPU free?', 'how full is Ocra's disk?', 'which node is under load?'). Returns matching series with labels and values.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "A PromQL expression, e.g. 'DCGM_FI_DEV_GPU_UTIL', 'node_filesystem_avail_bytes{mountpoint=\"/\"}', or 'up'." }
+        },
+        "required": ["query"]
+      },
+      "endpoint": { "type": "builtin", "name": "query_metrics" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Homelab",
+      "icon": "activity"
     }
   ]
 }
