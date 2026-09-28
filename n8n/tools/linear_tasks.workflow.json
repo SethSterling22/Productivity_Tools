@@ -53,7 +53,7 @@
         "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
         "sendBody": true, "specifyBody": "json",
-        "jsonBody": "={{ (() => { const b = $json.body || {}; const LINEAR_TEAM_ID = 'REPLACE_WITH_LINEAR_TEAM_UUID'; const input = { name: String(b.name || 'Nuevo proyecto').slice(0,200), description: String(b.description || ''), teamIds: [LINEAR_TEAM_ID] }; return JSON.stringify({ query: 'mutation($input:ProjectCreateInput!){ projectCreate(input:$input){ success project{ id name url } } }', variables: { input } }); })() }}",
+        "jsonBody": "={{ (() => { const b = $json.body || {}; const LINEAR_TEAM_ID = 'REPLACE_WITH_LINEAR_TEAM_UUID'; const LINEAR_LEAD_ID = 'REPLACE_WITH_YOUR_LINEAR_USER_ID'; const input = { name: String(b.name || 'Nuevo proyecto').slice(0,200), description: String(b.description || ''), teamIds: [LINEAR_TEAM_ID] }; if (LINEAR_LEAD_ID && !LINEAR_LEAD_ID.startsWith('REPLACE')) { input.leadId = LINEAR_LEAD_ID; input.memberIds = [LINEAR_LEAD_ID]; } return JSON.stringify({ query: 'mutation($input:ProjectCreateInput!){ projectCreate(input:$input){ success project{ id name url } } }', variables: { input } }); })() }}",
         "options": {}
       },
       "id": "cp-http", "name": "Linear — create project", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [460, 420],
