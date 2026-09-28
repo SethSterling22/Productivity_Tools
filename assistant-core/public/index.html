@@ -130,6 +130,24 @@
   .cap:hover { color: var(--lime); border-color: var(--lime); }
   #graph { height: 260px; background: var(--panel2); border-top: 1px solid var(--border); }
   .hint { font-size: 10px; color: var(--muted); padding: 8px 14px 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; }
+  /* card header controls (search / center) */
+  .h2ctl { margin-left: auto; display: flex; gap: 12px; font-size: 13px; color: var(--muted); }
+  .h2ctl span { cursor: pointer; } .h2ctl span:hover { color: var(--lime); }
+  /* brain search panel */
+  .brain-search { display: none; padding: 10px 14px; border-top: 1px solid var(--border); }
+  .brain-search.open { display: block; }
+  .brain-search input { width: 100%; box-sizing: border-box; background: var(--panel2); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; font: inherit; outline: none; }
+  .brain-search input:focus { border-color: var(--lime); }
+  #brainResults { margin-top: 8px; max-height: 220px; overflow-y: auto; }
+  .bnote { display: flex; align-items: baseline; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); text-decoration: none; }
+  .bnote:hover { background: rgba(188,191,86,.08); color: var(--lime); }
+  .bnote .bf { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .brain-more { margin-top: 8px; width: 100%; background: var(--panel2); border: 1px solid var(--border-hi); color: var(--text); padding: 6px; cursor: pointer; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .brain-more:hover { border-color: var(--lime); color: var(--lime); }
+  /* language toggle */
+  #langToggle { margin-left: 10px; background: var(--panel2); color: var(--muted); border: 1px solid var(--border); font-family: var(--mono); font-size: 10px; padding: 3px 8px; cursor: pointer; letter-spacing: 1px; }
+  #langToggle:hover { border-color: var(--border-hi); color: var(--text); }
+  @media (max-width: 859px) { #langToggle { display: none; } }
 
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: #262626; }
@@ -325,57 +343,68 @@
       <div class="logo">R</div>
       <h1>Rebeca</h1>
       <button id="convosToggle" title="Conversaciones" aria-label="Conversaciones">🗂</button>
-      <div class="status"><span class="dot" id="healthDot"></span><span id="healthText">conectando</span></div>
+      <div class="status"><span class="dot" id="healthDot"></span><span id="healthText" data-i18n="status_connecting">conectando</span></div>
       <div class="modelpick" id="modelPick">
         <button class="modelbtn" id="modelBtn" title="Modelo (auto = el router decide; clic para elegir)">auto · router</button>
         <div class="modelmenu" id="modelMenu"></div>
       </div>
+      <button id="langToggle" title="Idioma / Language">ES</button>
       <button id="panelToggle" title="Panel" aria-label="Panel">☰</button>
     </div>
     <div class="messages" id="messages"></div>
     <div class="composer">
       <button class="mic" id="mic" title="Hablar (clic para grabar, clic para enviar)">MIC</button>
-      <textarea id="input" rows="1" placeholder="Escribe a Rebeca…  (Enter para enviar)"></textarea>
-      <button id="send">Enviar</button>
+      <textarea id="input" rows="1" data-i18n-ph="input_ph" placeholder="Escribe a Rebeca…  (Enter para enviar)"></textarea>
+      <button id="send" data-i18n="send">Enviar</button>
       <button class="mic" id="stopVoice" title="Detener voz" style="display:none">■</button>
     </div>
   </section>
 
   <aside class="side" id="side">
     <div class="card">
-      <h2>Próximos eventos</h2>
-      <div class="body" id="calendar"><span class="empty">Cargando…</span></div>
+      <h2><span data-i18n="card_events">Próximos eventos</span></h2>
+      <div class="body" id="calendar"><span class="empty" data-i18n="loading">Cargando…</span></div>
     </div>
     <div class="card">
-      <h2>Tareas
-        <span style="margin-left:auto;display:flex;gap:10px;font-family:var(--mono);font-size:12px;color:var(--muted)">
-          <span id="tasksExpand" title="Abrir gestor" style="cursor:pointer">⛶</span>
-          <span id="tasksReload" title="Actualizar" style="cursor:pointer">↻</span>
+      <h2><span data-i18n="card_tasks">Tareas</span>
+        <span class="h2ctl">
+          <span id="tasksExpand" title="Abrir gestor">⛶</span>
+          <span id="tasksReload" title="Actualizar">↻</span>
         </span>
       </h2>
-      <div class="body" id="tasks"><span class="empty">Cargando…</span></div>
+      <div class="body" id="tasks"><span class="empty" data-i18n="loading">Cargando…</span></div>
     </div>
     <div class="card">
-      <h2>Homelab</h2>
-      <div class="body" id="homelab"><span class="empty">Cargando…</span></div>
+      <h2><span data-i18n="card_homelab">Homelab</span></h2>
+      <div class="body" id="homelab"><span class="empty" data-i18n="loading">Cargando…</span></div>
     </div>
     <div class="card">
-      <h2>Second brain</h2>
+      <h2><span data-i18n="card_brain">Second brain</span>
+        <span class="h2ctl">
+          <span id="brainSearchToggle" title="Buscar">🔍</span>
+          <span id="brainCenter" title="Centrar">⌖</span>
+        </span>
+      </h2>
       <div id="graph"></div>
+      <div class="brain-search" id="brainSearch">
+        <input id="brainQuery" data-i18n-ph="brain_search_ph" placeholder="Buscar nota…" autocomplete="off" />
+        <div id="brainResults"></div>
+        <button class="brain-more" id="brainMore" data-i18n="more" style="display:none">Cargar más</button>
+      </div>
       <div class="hint" id="graphHint"></div>
     </div>
     <div class="card">
-      <h2>Capacidades</h2>
-      <div class="body"><div class="caps" id="caps"><span class="empty">Cargando…</span></div></div>
+      <h2><span data-i18n="card_caps">Capacidades</span></h2>
+      <div class="body"><div class="caps" id="caps"><span class="empty" data-i18n="loading">Cargando…</span></div></div>
     </div>
   </aside>
 
   <aside class="convos" id="convos">
     <div class="convos-head">
-      <h2>Conversaciones</h2>
-      <button id="convosNew" title="Nueva">＋ Nueva</button>
+      <h2 data-i18n="convos_title">Conversaciones</h2>
+      <button id="convosNew" title="Nueva" data-i18n="convos_new">＋ Nueva</button>
     </div>
-    <input id="convosSearch" placeholder="Buscar…" autocomplete="off" />
+    <input id="convosSearch" data-i18n-ph="convos_search_ph" placeholder="Buscar…" autocomplete="off" />
     <div id="convosList"></div>
   </aside>
 
@@ -383,15 +412,15 @@
 
   <div id="paletteWrap">
     <div class="palette" role="dialog" aria-label="Acciones rápidas">
-      <input id="paletteInput" placeholder="Buscar acción…  (Esc para cerrar)" autocomplete="off" />
+      <input id="paletteInput" data-i18n-ph="pal_ph" placeholder="Buscar acción…  (Esc para cerrar)" autocomplete="off" />
       <div class="pal-list" id="paletteList"></div>
-      <div class="pal-hint">↑↓ navegar · Enter ejecutar · Esc cerrar</div>
+      <div class="pal-hint" data-i18n="pal_hint">↑↓ navegar · Enter ejecutar · Esc cerrar</div>
     </div>
   </div>
 
   <div id="taskModalWrap">
     <div class="taskmodal" role="dialog" aria-label="Gestor de tareas">
-      <div class="tm-head"><span>Tareas · Linear</span><span id="tmReload" title="Actualizar" style="margin-left:auto;cursor:pointer">↻</span><span id="tmClose" title="Cerrar" style="margin-left:14px;cursor:pointer">✕</span></div>
+      <div class="tm-head"><span data-i18n="tm_title">Tareas · Linear</span><span id="tmReload" title="Actualizar" style="margin-left:auto;cursor:pointer">↻</span><span id="tmClose" title="Cerrar" style="margin-left:14px;cursor:pointer">✕</span></div>
       <div class="tm-body" id="tmBody"></div>
     </div>
   </div>
@@ -405,6 +434,58 @@ let sessionId = "dashboard:" + (localStorage.getItem("rebeca_sid") || (() => {
 
 const $ = (id) => document.getElementById(id);
 const messages = $("messages");
+
+// ── i18n (ES/EN) ──
+let lang = localStorage.getItem("rebeca_lang") || "es";
+const I18N = {
+  es: {
+    send: "Enviar", card_events: "Próximos eventos", card_tasks: "Tareas", card_homelab: "Homelab",
+    card_brain: "Second brain", card_caps: "Capacidades", convos_title: "Conversaciones", convos_new: "＋ Nueva",
+    convos_search_ph: "Buscar…", input_ph: "Escribe a Rebeca…  (Enter para enviar)", brain_search_ph: "Buscar nota…",
+    more: "Cargar más", loading: "Cargando…",
+    greeting: "Hola Sebastian 👋 Soy Rebeca. ¿En qué te ayudo hoy?",
+    new_convo_msg: "Nueva conversación. ¿En qué te ayudo, Sebastian?",
+    status_connecting: "conectando", status_online: "en línea · ", status_offline: "sin conexión",
+    cal_none: "Sin eventos próximos.", cal_unavailable: "Calendario no disponible.",
+    tasks_none: "Sin tareas.", tasks_unavailable: "Tareas no disponibles.",
+    homelab_services: "Servicios", homelab_active: "activos", homelab_resources: "Recursos",
+    homelab_metrics_off: "Configura PROMETHEUS_URL para ver CPU/RAM/GPU.",
+    homelab_nodata: "Sin datos (revisa exporters / nombres de métricas).", homelab_unavailable: "Estado no disponible.",
+    graph_notes: "nota(s)", graph_links: "enlace(s)", graph_unavailable: "Grafo no disponible.", no_results: "Sin resultados.",
+    tm_title: "Tareas · Linear", tm_none: "Sin tareas.", f_title: "Título", f_state: "Estado", f_priority: "Prioridad",
+    btn_save: "Guardar", open_linear: "Abrir en Linear ↗", saving: "Guardando…", saved: "✓ guardado", err: "⚠ error",
+    pal_ph: "Buscar acción…  (Esc para cerrar)", pal_hint: "↑↓ navegar · Enter ejecutar · Esc cerrar", pal_none: "Sin coincidencias",
+    prio_normal: "Normal", prio_urgent: "Urgente", prio_high: "Alta", prio_low: "Baja", prio_none: "Sin prioridad",
+  },
+  en: {
+    send: "Send", card_events: "Upcoming events", card_tasks: "Tasks", card_homelab: "Homelab",
+    card_brain: "Second brain", card_caps: "Capabilities", convos_title: "Conversations", convos_new: "＋ New",
+    convos_search_ph: "Search…", input_ph: "Message Rebeca…  (Enter to send)", brain_search_ph: "Search note…",
+    more: "Load more", loading: "Loading…",
+    greeting: "Hi Sebastian 👋 I'm Rebeca. How can I help today?",
+    new_convo_msg: "New conversation. How can I help, Sebastian?",
+    status_connecting: "connecting", status_online: "online · ", status_offline: "offline",
+    cal_none: "No upcoming events.", cal_unavailable: "Calendar unavailable.",
+    tasks_none: "No tasks.", tasks_unavailable: "Tasks unavailable.",
+    homelab_services: "Services", homelab_active: "up", homelab_resources: "Resources",
+    homelab_metrics_off: "Set PROMETHEUS_URL to see CPU/RAM/GPU.",
+    homelab_nodata: "No data (check exporters / metric names).", homelab_unavailable: "Status unavailable.",
+    graph_notes: "note(s)", graph_links: "link(s)", graph_unavailable: "Graph unavailable.", no_results: "No results.",
+    tm_title: "Tasks · Linear", tm_none: "No tasks.", f_title: "Title", f_state: "State", f_priority: "Priority",
+    btn_save: "Save", open_linear: "Open in Linear ↗", saving: "Saving…", saved: "✓ saved", err: "⚠ error",
+    pal_ph: "Search action…  (Esc to close)", pal_hint: "↑↓ navigate · Enter run · Esc close", pal_none: "No matches",
+    prio_normal: "Normal", prio_urgent: "Urgent", prio_high: "High", prio_low: "Low", prio_none: "No priority",
+  },
+};
+function t(k) { return (I18N[lang] && I18N[lang][k] !== undefined) ? I18N[lang][k] : (I18N.es[k] !== undefined ? I18N.es[k] : k); }
+function applyLang(l) {
+  lang = l; localStorage.setItem("rebeca_lang", l);
+  document.documentElement.lang = l;
+  $("langToggle").textContent = l.toUpperCase();
+  document.querySelectorAll("[data-i18n]").forEach((el) => { const v = I18N[l][el.getAttribute("data-i18n")]; if (v !== undefined) el.textContent = v; });
+  document.querySelectorAll("[data-i18n-ph]").forEach((el) => { const v = I18N[l][el.getAttribute("data-i18n-ph")]; if (v !== undefined) el.setAttribute("placeholder", v); });
+  try { loadHealth(); loadCalendar(); loadTasks(); loadHomelab(); } catch (e) {}
+}
 
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function linkify(s) { return esc(s).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'); }
@@ -684,10 +765,10 @@ async function loadHealth() {
   try {
     const h = await (await fetch(API + "/health")).json();
     $("healthDot").className = "dot ok";
-    $("healthText").textContent = "en línea · " + h.llm;
+    $("healthText").textContent = t("status_online") + h.llm;
   } catch {
     $("healthDot").className = "dot err";
-    $("healthText").textContent = "sin conexión";
+    $("healthText").textContent = t("status_offline");
   }
 }
 
@@ -695,7 +776,7 @@ async function loadCalendar() {
   try {
     const r = await (await fetch(API + "/widgets/calendar")).json();
     const events = r.events || [];
-    if (!events.length) { $("calendar").innerHTML = '<span class="empty">Sin eventos próximos.</span>'; return; }
+    if (!events.length) { $("calendar").innerHTML = '<span class="empty">' + t("cal_none") + '</span>'; return; }
     $("calendar").innerHTML = events.map(e => {
       const inner = '<span class="t">' + esc(e.date || "") + '<br>' + esc(e.time || "") + '</span><span>' + esc(e.title || "") + '</span>';
       return e.url
@@ -703,7 +784,7 @@ async function loadCalendar() {
         : '<div class="cal-item">' + inner + '</div>';
     }).join("");
   } catch {
-    $("calendar").innerHTML = '<span class="empty">Calendario no disponible.</span>';
+    $("calendar").innerHTML = '<span class="empty">' + t("cal_unavailable") + '</span>';
   }
 }
 
@@ -741,7 +822,7 @@ async function loadGraph() {
     const g = await (await fetch(API + "/widgets/brain-graph")).json();
     const nodes = g.nodes || [];
     const links = (g.edges || []).map(e => ({ source: e.source, target: e.target }));
-    $("graphHint").textContent = nodes.length + " nota(s) · " + links.length + " enlace(s)";
+    $("graphHint").textContent = nodes.length + " " + t("graph_notes") + " · " + links.length + " " + t("graph_links");
     const folders = [...new Set(nodes.map(n => n.folder || "root"))];
     const palette = ["#bcbf56", "#f27e63", "#bf6550", "#71734c", "#d8d8d8"];
     const colorOf = (f) => palette[folders.indexOf(f) % palette.length];
@@ -755,10 +836,32 @@ async function loadGraph() {
       .linkColor(() => "rgba(216,216,216,.35)")
       .graphData({ nodes, links });
     Graph.onNodeClick(n => { if (n.url) window.open(n.url, "_blank"); });
+    brainNodes = nodes; brainGraph = Graph;
+    if ($("brainSearch").classList.contains("open")) renderBrainResults();
   } catch (err) {
-    document.getElementById("graphHint").textContent = "Grafo no disponible.";
+    document.getElementById("graphHint").textContent = t("graph_unavailable");
   }
 }
+
+// ── Second-brain search + center ──
+let brainNodes = [], brainGraph = null, brainShown = 35;
+function renderBrainResults() {
+  const q = ($("brainQuery").value || "").toLowerCase();
+  let list = brainNodes;
+  if (q) list = brainNodes.filter((n) => ((n.title || n.id) + " " + (n.folder || "") + " " + ((n.tags || []).join(" "))).toLowerCase().includes(q));
+  const shown = list.slice(0, brainShown);
+  $("brainResults").innerHTML = shown.map((n) =>
+    '<a class="bnote" href="' + esc(n.url || "#") + '" target="_blank" rel="noopener">' + esc(n.title || n.id) + '<span class="bf">' + esc(n.folder || "") + "</span></a>"
+  ).join("") || '<div class="empty" style="font-size:12px">' + t("no_results") + "</div>";
+  $("brainMore").style.display = list.length > brainShown ? "" : "none";
+}
+$("brainSearchToggle").onclick = () => {
+  const el = $("brainSearch"); el.classList.toggle("open");
+  if (el.classList.contains("open")) { brainShown = 35; renderBrainResults(); $("brainQuery").focus(); }
+};
+$("brainCenter").onclick = () => { if (brainGraph) brainGraph.zoomToFit(400, 20); };
+$("brainQuery").oninput = () => { brainShown = 35; renderBrainResults(); };
+$("brainMore").onclick = () => { brainShown += 35; renderBrainResults(); };
 
 // Restore the conversation on reload (backend keeps it per session).
 async function loadHistory() {
@@ -779,7 +882,7 @@ function newChat() {
   sessionId = "dashboard:" + id;
   stopSpeaking();
   messages.innerHTML = "";
-  addMsg("assistant", "Nueva conversación. ¿En qué te ayudo, Sebastian?");
+  addMsg("assistant", t("new_convo_msg"));
 }
 // ── Model picker: one control that is both the selector and the last-used
 //    indicator. In "auto" it shows what the router picked ("auto · model @host");
@@ -862,7 +965,7 @@ async function loadTasks() {
     const r = await invokeTool("list_tasks", { limit: 50 });
     if (r && r.ok === false) throw new Error(r.error || "error");
     const projects = (r && r.projects) || [];
-    if (!projects.length) { $("tasks").innerHTML = '<span class="empty">Sin tareas.</span>'; return; }
+    if (!projects.length) { $("tasks").innerHTML = '<span class="empty">' + t("tasks_none") + '</span>'; return; }
     let html = "";
     for (const p of projects) {
       const total = p.tasks.length + p.tasks.reduce((s, t) => s + (t.children ? t.children.length : 0), 0);
@@ -884,7 +987,7 @@ async function loadTasks() {
       body.style.display = open ? "none" : "";
       el.querySelector(".arw").textContent = open ? "▸" : "▾";
     });
-  } catch { $("tasks").innerHTML = '<span class="empty">Tareas no disponibles.</span>'; }
+  } catch { $("tasks").innerHTML = '<span class="empty">' + t("tasks_unavailable") + '</span>'; }
 }
 
 // ── Homelab / status widget ──
@@ -894,14 +997,14 @@ async function loadHomelab() {
     const r = await (await fetch(API + "/widgets/homelab")).json();
     const svcs = r.services || [], panels = r.panels || [];
     // ── Left column: services (processes) ──
-    let left = '<div class="hl-lbl">Servicios · ' + svcs.filter(s => s.up).length + "/" + svcs.length + " activos</div>";
+    let left = '<div class="hl-lbl">' + t("homelab_services") + " · " + svcs.filter(s => s.up).length + "/" + svcs.length + " " + t("homelab_active") + "</div>";
     left += svcs.map((s) =>
       '<div class="svc"><span class="d ' + (s.up ? "up" : "down") + '"></span><span class="n">' + esc(s.name) + "</span></div>"
     ).join("");
     // ── Right column: resource bars, pivoted per node (scrollable) ──
-    let right = '<div class="hl-lbl">Recursos</div>';
+    let right = '<div class="hl-lbl">' + t("homelab_resources") + "</div>";
     if (!r.metricsEnabled) {
-      right += '<div class="empty" style="font-size:12px">Configura PROMETHEUS_URL para ver CPU/RAM/GPU.</div>';
+      right += '<div class="empty" style="font-size:12px">' + t("homelab_metrics_off") + '</div>';
     } else {
       const nodes = {};
       for (const p of panels) {
@@ -910,7 +1013,7 @@ async function loadHomelab() {
       }
       const names = Object.keys(nodes);
       if (!names.length) {
-        right += '<div class="empty" style="font-size:12px">Sin datos (revisa exporters / nombres de métricas).</div>';
+        right += '<div class="empty" style="font-size:12px">' + t("homelab_nodata") + '</div>';
       } else {
         for (const n of names) {
           right += '<div class="hl-node"><div class="hl-name">' + esc(n) + '</div><div class="hl-bars">' +
@@ -925,14 +1028,14 @@ async function loadHomelab() {
       }
     }
     $("homelab").innerHTML = '<div class="hl-cols"><div class="hl-col-svc">' + left + '</div><div class="hl-col-res">' + right + "</div></div>";
-  } catch { $("homelab").innerHTML = '<span class="empty">Estado no disponible.</span>'; }
+  } catch { $("homelab").innerHTML = '<span class="empty">' + t("homelab_unavailable") + '</span>'; }
 }
 $("tasksReload").onclick = loadTasks;
 
 // ── Task manager (expanded, editable tree) ──
 let tmTasks = {};
 const TM_STATES = ["Backlog", "Todo", "In Progress", "Done", "Canceled"];
-const TM_PRIOS = [["3", "Normal"], ["1", "Urgente"], ["2", "Alta"], ["4", "Baja"], ["0", "Sin prioridad"]];
+const TM_PRIOS = [["3", "prio_normal"], ["1", "prio_urgent"], ["2", "prio_high"], ["4", "prio_low"], ["0", "prio_none"]];
 function tmRow(t, isChild) {
   tmTasks[t.id] = t;
   const done = t.type === "completed";
@@ -943,23 +1046,23 @@ function tmRow(t, isChild) {
       '<span class="tm-state">' + esc(t.state || "") + "</span>" +
     '</div><div class="tm-editor" style="display:none"></div></div>';
 }
-function tmEditorHtml(t) {
+function tmEditorHtml(task) {
   const n = (s) => (s || "").toLowerCase();
-  const states = TM_STATES.map((s) => "<option" + (n(s) === n(t.state) ? " selected" : "") + ">" + s + "</option>").join("");
-  const prios = TM_PRIOS.map((p) => '<option value="' + p[0] + '"' + (String(t.priority) === p[0] ? " selected" : "") + ">" + p[1] + "</option>").join("");
-  return '<div class="tm-field full"><label>Título</label><input data-f="title" value="' + esc(t.title) + '"></div>' +
-    '<div class="tm-field"><label>Estado</label><select data-f="state">' + states + "</select></div>" +
-    '<div class="tm-field"><label>Prioridad</label><select data-f="priority">' + prios + "</select></div>" +
-    '<div class="tm-actions"><button data-act="save">Guardar</button>' +
-      (t.url ? '<a href="' + esc(t.url) + '" target="_blank" rel="noopener">Abrir en Linear ↗</a>' : "") +
+  const states = TM_STATES.map((s) => "<option" + (n(s) === n(task.state) ? " selected" : "") + ">" + s + "</option>").join("");
+  const prios = TM_PRIOS.map((p) => '<option value="' + p[0] + '"' + (String(task.priority) === p[0] ? " selected" : "") + ">" + t(p[1]) + "</option>").join("");
+  return '<div class="tm-field full"><label>' + t("f_title") + '</label><input data-f="title" value="' + esc(task.title) + '"></div>' +
+    '<div class="tm-field"><label>' + t("f_state") + '</label><select data-f="state">' + states + "</select></div>" +
+    '<div class="tm-field"><label>' + t("f_priority") + '</label><select data-f="priority">' + prios + "</select></div>" +
+    '<div class="tm-actions"><button data-act="save">' + t("btn_save") + "</button>" +
+      (task.url ? '<a href="' + esc(task.url) + '" target="_blank" rel="noopener">' + t("open_linear") + "</a>" : "") +
       '<span class="tm-msg" style="color:var(--muted);font-size:11px;font-family:var(--mono)"></span></div>';
 }
 async function renderTaskManager() {
   tmTasks = {};
-  $("tmBody").innerHTML = '<div class="empty" style="padding:16px">Cargando…</div>';
+  $("tmBody").innerHTML = '<div class="empty" style="padding:16px">' + t("loading") + '</div>';
   let projects = [];
   try { const r = await invokeTool("list_tasks", { limit: 100 }); projects = (r && r.projects) || []; } catch {}
-  if (!projects.length) { $("tmBody").innerHTML = '<div class="empty" style="padding:16px">Sin tareas.</div>'; return; }
+  if (!projects.length) { $("tmBody").innerHTML = '<div class="empty" style="padding:16px">' + t("tm_none") + '</div>'; return; }
   let html = "";
   for (const p of projects) {
     html += '<div class="tm-proj"><div class="tm-proj-h">' + esc(p.name) + "</div>";
@@ -984,13 +1087,13 @@ async function renderTaskManager() {
         const title = editor.querySelector('[data-f="title"]').value.trim();
         const priority = parseInt(editor.querySelector('[data-f="priority"]').value, 10);
         const state = editor.querySelector('[data-f="state"]').value;
-        const msg = editor.querySelector(".tm-msg"); msg.textContent = "Guardando…";
+        const msg = editor.querySelector(".tm-msg"); msg.textContent = t("saving");
         try {
           await invokeTool("update_task", { id, title, priority });
           if (state && state.toLowerCase() !== String(tmTasks[id].state || "").toLowerCase()) await invokeTool("complete_task", { id, state });
-          msg.textContent = "✓ guardado";
+          msg.textContent = t("saved");
           setTimeout(() => { renderTaskManager(); loadTasks(); }, 500);
-        } catch { msg.textContent = "⚠ error"; }
+        } catch { msg.textContent = t("err"); }
       };
     };
   });
@@ -1012,7 +1115,7 @@ function renderPalette(q) {
   palSel = 0;
   $("paletteList").innerHTML = palFiltered.map((t, i) =>
     '<div class="pal-item' + (i === 0 ? " sel" : "") + '" data-i="' + i + '"><div class="pn">' + esc(t.name) + '</div><div class="pd">' + esc(t.description || "") + "</div></div>"
-  ).join("") || '<div class="pal-item"><div class="pd">Sin coincidencias</div></div>';
+  ).join("") || '<div class="pal-item"><div class="pd">' + t("pal_none") + '</div></div>';
   $("paletteList").querySelectorAll(".pal-item[data-i]").forEach((el) => el.onclick = () => chooseTool(palFiltered[+el.dataset.i]));
 }
 function chooseTool(t) {
@@ -1066,8 +1169,10 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-loadHistory().then((had) => { if (!had) addMsg("assistant", "Hola Sebastian 👋 Soy Rebeca. ¿En qué te ayudo hoy?"); });
-loadHealth(); loadCalendar(); loadCaps(); loadGraph(); loadTasks(); loadHomelab(); loadModels();
+$("langToggle").onclick = () => applyLang(lang === "es" ? "en" : "es");
+loadHistory().then((had) => { if (!had) addMsg("assistant", t("greeting")); });
+applyLang(lang);   // sets language on static + dynamic UI (also loads health/calendar/tasks/homelab)
+loadCaps(); loadGraph(); loadModels();
 setInterval(loadHealth, 30000);
 setInterval(loadCalendar, 300000); // keep upcoming events fresh (every 5 min)
 setInterval(loadHomelab, 30000);   // refresh homelab status
