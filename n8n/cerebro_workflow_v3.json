@@ -1,0 +1,150 @@
+{
+  "name": "cerebro v3 — Telegram → Rebeca (unified)",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message"], "additionalFields": {} },
+      "id": "tg-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "credentials": { "telegramApi": { "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize the Telegram update. Detect voice notes / audio.\nconst msg = $input.first().json;\nconst m = msg.message || {};\nconst voice = m.voice || m.audio || null;\nreturn [{ json: {\n  raw_text: m.text || m.caption || '',\n  chat_id: m.chat && m.chat.id,\n  username: (m.from && m.from.username) || 'unknown',\n  timestamp: new Date().toISOString(),\n  is_voice: !!voice,\n  voice_file_id: voice ? voice.file_id : null\n} }];"
+      },
+      "id": "extract",
+      "name": "Extract message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.is_voice }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-voice",
+      "name": "Is voice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [620, 300]
+    },
+    {
+      "parameters": { "resource": "file", "fileId": "={{ $json.voice_file_id }}" },
+      "id": "tg-getfile",
+      "name": "Telegram — Get file",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [840, 200],
+      "credentials": { "telegramApi": { "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4000/voice/transcribe",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "audio/ogg" }] },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "transcribe",
+      "name": "Transcribe voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1060, 200],
+      "credentials": { "httpHeaderAuth": { "name": "Rebeca Internal" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn the transcription into the normal message shape.\nconst r = $input.first().json;\nconst src = $('Extract message').first().json;\nconst text = (r && r.text) ? r.text.trim() : '';\nreturn [{ json: { raw_text: text, chat_id: src.chat_id, username: src.username, timestamp: src.timestamp } }];"
+      },
+      "id": "voice-text",
+      "name": "Voice → text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1280, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Everything goes to Rebeca (assistant-core). Slash commands are mapped to\n// natural language so Rebeca picks the right tool; free text is sent as-is.\n// Rebeca keeps memory per Telegram chat, so /plan approval works conversationally.\nconst d = $input.first().json;\nlet text = (d.raw_text || '').trim();\nconst MAP = {\n  '/task': 'Crea una tarea en Linear: ',\n  '/note': 'Guarda una nota en el second brain: ',\n  '/plan': 'Planifica esto: propón el plan (proyecto, tarea padre y subtareas) y pídeme confirmación antes de crearlo. ',\n  '/calendar': 'Agenda en Google Calendar: ',\n  '/cal': 'Agenda en Google Calendar: ',\n  '/brain': 'Busca en mi second brain y responde con base en mis notas: ',\n  '/show_brain': 'Busca en mi second brain y responde con base en mis notas: ',\n  '/web': 'Busca en la web: '\n};\nconst m = text.match(/^(\\/[a-z_]+)(?=$|\\s)/i);\nif (m) {\n  const cmd = m[1].toLowerCase();\n  const rest = text.slice(m[1].length).trim();\n  text = (MAP[cmd] !== undefined) ? (MAP[cmd] + rest) : (rest || text); // /qwen /claude /chat -> plain text\n}\nif (!text) text = '(mensaje vacío)';\nconst body = { session_id: 'telegram:' + d.chat_id, message: text, channel: 'telegram' };\nreturn [{ json: { requestBody: JSON.stringify(body), chat_id: d.chat_id } }];"
+      },
+      "id": "to-rebeca",
+      "name": "To Rebeca",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1060, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:4000/chat",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "rebeca-chat",
+      "name": "Rebeca — chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 400],
+      "credentials": { "httpHeaderAuth": { "name": "Rebeca Internal" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rebeca returns { ok, response }. De-markdown lightly so Telegram (parse mode\n// None) reads clean, keeping URLs.\nconst r = $input.first().json;\nlet text = (r && r.response) ? String(r.response) : '⚠️ Sin respuesta de Rebeca.';\ntext = text\n  .replace(/\\*\\*(.*?)\\*\\*/g, '$1')\n  .replace(/(^|\\n)#{1,6}\\s*/g, '$1')\n  .replace(/`{1,3}/g, '')\n  .replace(/^\\s*[-*]\\s+/gm, '\\u2022 ')\n  .trim();\nif (text.length > 4000) text = text.slice(0, 3990) + '…';\nconst chat_id = $('To Rebeca').first().json.chat_id;\nreturn [{ json: { text, chat_id } }];"
+      },
+      "id": "format-reply",
+      "name": "Format reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 400]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "id": "tg-send",
+      "name": "Telegram — Send",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1720, 400],
+      "credentials": { "telegramApi": { "name": "Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [[{ "node": "Extract message", "type": "main", "index": 0 }]] },
+    "Extract message": { "main": [[{ "node": "Is voice?", "type": "main", "index": 0 }]] },
+    "Is voice?": {
+      "main": [
+        [{ "node": "Telegram — Get file", "type": "main", "index": 0 }],
+        [{ "node": "To Rebeca", "type": "main", "index": 0 }]
+      ]
+    },
+    "Telegram — Get file": { "main": [[{ "node": "Transcribe voice", "type": "main", "index": 0 }]] },
+    "Transcribe voice": { "main": [[{ "node": "Voice → text", "type": "main", "index": 0 }]] },
+    "Voice → text": { "main": [[{ "node": "To Rebeca", "type": "main", "index": 0 }]] },
+    "To Rebeca": { "main": [[{ "node": "Rebeca — chat", "type": "main", "index": 0 }]] },
+    "Rebeca — chat": { "main": [[{ "node": "Format reply", "type": "main", "index": 0 }]] },
+    "Format reply": { "main": [[{ "node": "Telegram — Send", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
