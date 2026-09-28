@@ -145,6 +145,23 @@
   .bnote .bf { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
   .brain-more { margin-top: 8px; width: 100%; background: var(--panel2); border: 1px solid var(--border-hi); color: var(--text); padding: 6px; cursor: pointer; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
   .brain-more:hover { border-color: var(--lime); color: var(--lime); }
+  /* files widget */
+  .files-crumb { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 8px; word-break: break-all; }
+  .files-crumb .crumb { cursor: pointer; } .files-crumb .crumb:hover { color: var(--lime); }
+  .files-drop { border: 1px dashed transparent; transition: border-color .15s, background .15s; min-height: 40px; }
+  .files-drop.dragover { border-color: var(--lime); background: rgba(188,191,86,.06); }
+  .file-row { display: flex; align-items: center; gap: 9px; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+  .file-row:last-child { border-bottom: none; }
+  .file-row .fi { color: var(--muted); flex: none; display: inline-flex; }
+  .file-row .fi svg { width: 15px; height: 15px; display: block; }
+  .file-row .fn { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
+  .file-row[data-dir="1"] .fn, .file-row[data-dir="1"] .fi { cursor: pointer; }
+  .file-row[data-dir="1"] .fn:hover { color: var(--lime); }
+  .file-row .fs { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .file-acts { display: flex; gap: 8px; flex: none; }
+  .file-act { color: var(--muted); cursor: pointer; display: inline-flex; text-decoration: none; }
+  .file-act:hover { color: var(--lime); }
+  .file-act svg { width: 14px; height: 14px; display: block; }
   /* language toggle */
   #langToggle { margin-left: 10px; background: var(--panel2); color: var(--muted); border: 1px solid var(--border); font-family: var(--mono); font-size: 10px; padding: 3px 8px; cursor: pointer; letter-spacing: 1px; }
   #langToggle:hover { border-color: var(--border-hi); color: var(--text); }
@@ -376,6 +393,20 @@
       <div class="body" id="tasks"><span class="empty" data-i18n="loading">Cargando…</span></div>
     </div>
     <div class="card">
+      <h2><span data-i18n="card_files">Archivos</span>
+        <span class="h2ctl">
+          <span id="filesUp" title="Subir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/></svg></span>
+          <span id="filesNewFolder" title="Nueva carpeta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></span>
+          <span id="filesReload" title="Actualizar">↻</span>
+        </span>
+      </h2>
+      <div class="body">
+        <div class="files-crumb" id="filesCrumb"></div>
+        <div class="files-drop" id="filesDrop"><div id="files"><span class="empty" data-i18n="loading">Cargando…</span></div></div>
+        <input type="file" id="filesInput" multiple style="display:none" />
+      </div>
+    </div>
+    <div class="card">
       <h2><span data-i18n="card_homelab">Homelab</span></h2>
       <div class="body" id="homelab"><span class="empty" data-i18n="loading">Cargando…</span></div>
     </div>
@@ -457,6 +488,7 @@ const I18N = {
     btn_save: "Guardar", open_linear: "Abrir en Linear ↗", saving: "Guardando…", saved: "✓ guardado", err: "⚠ error",
     pal_ph: "Buscar acción…  (Esc para cerrar)", pal_hint: "↑↓ navegar · Enter ejecutar · Esc cerrar", pal_none: "Sin coincidencias",
     prio_normal: "Normal", prio_urgent: "Urgente", prio_high: "Alta", prio_low: "Baja", prio_none: "Sin prioridad",
+    card_files: "Archivos", files_root: "inicio", files_empty: "Carpeta vacía.", files_unavailable: "Nextcloud no disponible.", files_folder_prompt: "Nombre de carpeta:", files_del_confirm: "¿Borrar", files_link: "Enlace de descarga:",
   },
   en: {
     send: "Send", card_events: "Upcoming events", card_tasks: "Tasks", card_homelab: "Homelab",
@@ -476,6 +508,7 @@ const I18N = {
     btn_save: "Save", open_linear: "Open in Linear ↗", saving: "Saving…", saved: "✓ saved", err: "⚠ error",
     pal_ph: "Search action…  (Esc to close)", pal_hint: "↑↓ navigate · Enter run · Esc close", pal_none: "No matches",
     prio_normal: "Normal", prio_urgent: "Urgent", prio_high: "High", prio_low: "Low", prio_none: "No priority",
+    card_files: "Files", files_root: "home", files_empty: "Empty folder.", files_unavailable: "Nextcloud unavailable.", files_folder_prompt: "Folder name:", files_del_confirm: "Delete", files_link: "Download link:",
   },
 };
 function t(k) { return (I18N[lang] && I18N[lang][k] !== undefined) ? I18N[lang][k] : (I18N.es[k] !== undefined ? I18N.es[k] : k); }
@@ -1105,6 +1138,86 @@ $("tmReload").onclick = renderTaskManager;
 $("taskModalWrap").onclick = (e) => { if (e.target.id === "taskModalWrap") $("taskModalWrap").classList.remove("show"); };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("taskModalWrap").classList.remove("show"); });
 
+// ── Files (Nextcloud) widget ──
+let filesPath = "";
+const SVG = (p) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + p + "</svg>";
+const F_FOLDER = SVG('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>');
+const F_FILE = SVG('<path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>');
+const F_DL = SVG('<path d="M12 3v12"/><path d="M7 12l5 5 5-5"/><path d="M5 21h14"/>');
+const F_SHARE = SVG('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 1 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 1 0 7 7l1-1"/>');
+const F_DEL = SVG('<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/>');
+function humanSize(n) { if (!n) return ""; const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return (Math.round(n * 10) / 10) + " " + u[i]; }
+function renderCrumb() {
+  const parts = filesPath ? filesPath.split("/") : [];
+  let acc = "", html = '<span class="crumb" data-p="">' + t("files_root") + "</span>";
+  for (const p of parts) { acc = acc ? acc + "/" + p : p; html += ' / <span class="crumb" data-p="' + esc(acc) + '">' + esc(p) + "</span>"; }
+  $("filesCrumb").innerHTML = html;
+  $("filesCrumb").querySelectorAll(".crumb").forEach((el) => el.onclick = () => loadFiles(el.dataset.p));
+}
+function fileRow(it) {
+  const dl = it.isDir ? "" : '<a class="file-act" href="' + API + "/files/download?path=" + encodeURIComponent(it.path) + '" title="Descargar">' + F_DL + "</a>";
+  return '<div class="file-row" data-path="' + esc(it.path) + '" data-dir="' + (it.isDir ? 1 : 0) + '">' +
+    '<span class="fi">' + (it.isDir ? F_FOLDER : F_FILE) + "</span>" +
+    '<span class="fn">' + esc(it.name) + "</span>" +
+    '<span class="fs">' + (it.isDir ? "" : humanSize(it.size)) + "</span>" +
+    '<span class="file-acts">' + dl +
+      '<span class="file-act" data-act="share" title="Compartir">' + F_SHARE + "</span>" +
+      '<span class="file-act" data-act="del" title="Borrar">' + F_DEL + "</span>" +
+    "</span></div>";
+}
+async function loadFiles(path) {
+  filesPath = path || "";
+  renderCrumb();
+  $("files").innerHTML = '<span class="empty">' + t("loading") + "</span>";
+  try {
+    const r = await (await fetch(API + "/files/list?path=" + encodeURIComponent(filesPath))).json();
+    if (r.ok === false) throw new Error(r.error || "error");
+    const items = r.items || [];
+    if (!items.length) { $("files").innerHTML = '<span class="empty">' + t("files_empty") + "</span>"; return; }
+    $("files").innerHTML = items.map(fileRow).join("");
+    $("files").querySelectorAll(".file-row").forEach((row) => {
+      const path = row.dataset.path, isDir = row.dataset.dir === "1";
+      const nav = () => { if (isDir) loadFiles(path); };
+      row.querySelector(".fn").onclick = nav; row.querySelector(".fi").onclick = nav;
+      const share = row.querySelector('[data-act="share"]');
+      share.onclick = async (e) => {
+        e.stopPropagation();
+        const j = await (await fetch(API + "/files/share", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) })).json();
+        if (j.ok && j.url) prompt(t("files_link"), j.url); else addMsg("assistant", "⚠ " + (j.error || "share failed"));
+      };
+      const del = row.querySelector('[data-act="del"]');
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        if (!confirm(t("files_del_confirm") + " " + path + "?")) return;
+        await fetch(API + "/files/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
+        loadFiles(filesPath);
+      };
+    });
+  } catch { $("files").innerHTML = '<span class="empty">' + t("files_unavailable") + "</span>"; }
+}
+function uploadFiles(fileList) {
+  const files = [...fileList];
+  Promise.all(files.map((f) =>
+    fetch(API + "/files/upload?path=" + encodeURIComponent(filesPath) + "&name=" + encodeURIComponent(f.name),
+      { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: f })
+  )).then(() => loadFiles(filesPath)).catch(() => loadFiles(filesPath));
+}
+$("filesUp").onclick = () => $("filesInput").click();
+$("filesInput").onchange = (e) => { if (e.target.files.length) uploadFiles(e.target.files); e.target.value = ""; };
+$("filesNewFolder").onclick = async () => {
+  const name = prompt(t("files_folder_prompt")); if (!name) return;
+  const path = (filesPath ? filesPath + "/" : "") + name;
+  await fetch(API + "/files/mkdir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
+  loadFiles(filesPath);
+};
+$("filesReload").onclick = () => loadFiles(filesPath);
+(() => {
+  const drop = $("filesDrop");
+  ["dragover", "dragenter"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("dragover"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("dragover"); }));
+  drop.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+})();
+
 // ── Command palette (Ctrl-K / Cmd-K): fire any tool without typing a prompt ──
 let palTools = [], palFiltered = [], palSel = 0, palMode = null;
 async function ensurePalTools() { if (palTools.length) return; try { palTools = (await (await fetch(API + "/tools")).json()).tools || []; } catch {} }
@@ -1173,7 +1286,7 @@ document.addEventListener("keydown", (e) => {
 $("langToggle").onclick = () => applyLang(lang === "es" ? "en" : "es");
 loadHistory().then((had) => { if (!had) addMsg("assistant", t("greeting")); });
 applyLang(lang);   // sets language on static + dynamic UI (also loads health/calendar/tasks/homelab)
-loadCaps(); loadGraph(); loadModels();
+loadCaps(); loadGraph(); loadModels(); loadFiles("");
 setInterval(loadHealth, 30000);
 setInterval(loadCalendar, 300000); // keep upcoming events fresh (every 5 min)
 setInterval(loadHomelab, 30000);   // refresh homelab status

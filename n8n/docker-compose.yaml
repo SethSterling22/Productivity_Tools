@@ -191,6 +191,10 @@ services:
       - PROMETHEUS_URL=${PROMETHEUS_URL:-}
       # Optional: override the homelab metric panels (JSON array of {label,query,unit}).
       - METRICS_PANELS=${METRICS_PANELS:-}
+      # Nextcloud (files) — use an APP PASSWORD, not the main password.
+      - NEXTCLOUD_URL=${NEXTCLOUD_URL:-}
+      - NEXTCLOUD_USER=${NEXTCLOUD_USER:-}
+      - NEXTCLOUD_APP_PASSWORD=${NEXTCLOUD_APP_PASSWORD:-}
       # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).
       - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}

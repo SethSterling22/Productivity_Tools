@@ -221,6 +221,85 @@
       "channels": ["dashboard", "telegram"],
       "category": "Homelab",
       "icon": "activity"
+    },
+    {
+      "name": "list_files",
+      "description": "List files and folders in the user's Nextcloud, at an optional path. Use for 'what's in my Documents folder', 'list my files'. Returns items with name, path, isDir, size, mtime.",
+      "input_schema": {
+        "type": "object",
+        "properties": { "path": { "type": "string", "description": "Folder path, e.g. 'Documents' or 'Documents/2026'. Empty = root." } }
+      },
+      "endpoint": { "type": "builtin", "name": "list_files" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Archivos",
+      "icon": "folder"
+    },
+    {
+      "name": "create_folder",
+      "description": "Create a folder in Nextcloud at the given path.",
+      "input_schema": {
+        "type": "object",
+        "properties": { "path": { "type": "string", "description": "Full folder path to create, e.g. 'Documents/Proyectos'." } },
+        "required": ["path"]
+      },
+      "endpoint": { "type": "builtin", "name": "create_folder" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Archivos",
+      "icon": "folder-plus"
+    },
+    {
+      "name": "move_file",
+      "description": "Move or rename a file/folder in Nextcloud (src → dst full paths).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "src": { "type": "string", "description": "Current path." },
+          "dst": { "type": "string", "description": "New path (move or rename)." }
+        },
+        "required": ["src", "dst"]
+      },
+      "endpoint": { "type": "builtin", "name": "move_file" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Archivos",
+      "icon": "move"
+    },
+    {
+      "name": "delete_file",
+      "description": "Delete a file/folder in Nextcloud (moves it to the Nextcloud trash).",
+      "input_schema": {
+        "type": "object",
+        "properties": { "path": { "type": "string", "description": "Path to delete." } },
+        "required": ["path"]
+      },
+      "endpoint": { "type": "builtin", "name": "delete_file" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Archivos",
+      "icon": "trash"
+    },
+    {
+      "name": "share_file",
+      "description": "Create a public share link for a file/folder in Nextcloud. Optionally password-protect it.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Path to share." },
+          "password": { "type": "string", "description": "Optional password for the link." }
+        },
+        "required": ["path"]
+      },
+      "endpoint": { "type": "builtin", "name": "share_file" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Archivos",
+      "icon": "link"
+    },
+    {
+      "name": "storage_usage",
+      "description": "Report Nextcloud storage usage (used / total).",
+      "input_schema": { "type": "object", "properties": {} },
+      "endpoint": { "type": "builtin", "name": "storage_usage" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Archivos",
+      "icon": "hard-drive"
     }
   ]
 }

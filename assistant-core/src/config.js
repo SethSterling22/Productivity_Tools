@@ -48,6 +48,13 @@ export const config = {
   // Docker DNS on n8n_network, like Qdrant. No API key needed.
   searxngUrl: process.env.SEARXNG_URL || "http://searxng:8080",
 
+  // ── Nextcloud (files) ────────────────────────────────────────────────────────
+  // WebDAV + OCS against the Nextcloud on Aery. Use an APP PASSWORD, not the main
+  // password (Nextcloud → Settings → Security → Devices & sessions).
+  nextcloudUrl: (process.env.NEXTCLOUD_URL || "").replace(/\/$/, ""),
+  nextcloudUser: process.env.NEXTCLOUD_USER || "",
+  nextcloudPassword: process.env.NEXTCLOUD_APP_PASSWORD || "",
+
   // ── Homelab metrics (Prometheus) ────────────────────────────────────────────
   // Direct PromQL against Prometheus for the homelab widget + query_metrics tool.
   // Empty = metrics disabled (widget shows service health only).

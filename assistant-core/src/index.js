@@ -22,6 +22,7 @@ import { listModels } from "./router.js";
 import * as memory from "./memory.js";
 import * as rag from "./rag.js";
 import { homelabPanels, metricsEnabled } from "./metrics.js";
+import * as nc from "./nextcloud.js";
 import { authEnabled, loginUrl, exchangeCode, emailAllowed, secureCookies } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -222,6 +223,55 @@ app.get("/widgets/homelab", async () => {
     homelabPanels().catch(() => []),
   ]);
   return { services, panels, metricsEnabled: metricsEnabled() };
+});
+
+// ── Nextcloud files (dashboard widget). Credentials stay server-side. ─────────
+app.get("/files/list", async (req, reply) => {
+  try { return await nc.list((req.query && req.query.path) || ""); }
+  catch (err) { return reply.code(502).send({ ok: false, error: err.message }); }
+});
+app.get("/files/download", async (req, reply) => {
+  const p = req.query && req.query.path;
+  if (!p) return reply.code(400).send({ ok: false, error: "path required" });
+  try {
+    const { buffer, mime } = await nc.download(p);
+    reply.header("Content-Type", mime);
+    reply.header("Content-Disposition", `attachment; filename="${encodeURIComponent(p.split("/").pop())}"`);
+    return reply.send(buffer);
+  } catch (err) { return reply.code(502).send({ ok: false, error: err.message }); }
+});
+app.post("/files/upload", async (req, reply) => {
+  const dir = (req.query && req.query.path) || "";
+  const name = req.query && req.query.name;
+  if (!name) return reply.code(400).send({ ok: false, error: "name required" });
+  if (!req.body || !Buffer.isBuffer(req.body)) return reply.code(400).send({ ok: false, error: "empty body" });
+  const dest = (dir ? dir.replace(/\/$/, "") + "/" : "") + name;
+  try { return await nc.upload(dest, req.body, req.headers["content-type"]); }
+  catch (err) { return reply.code(502).send({ ok: false, error: err.message }); }
+});
+app.post("/files/mkdir", async (req, reply) => {
+  const p = req.body && req.body.path;
+  if (!p) return reply.code(400).send({ ok: false, error: "path required" });
+  try { return await nc.mkdir(p); } catch (err) { return reply.code(502).send({ ok: false, error: err.message }); }
+});
+app.post("/files/move", async (req, reply) => {
+  const { src, dst } = req.body || {};
+  if (!src || !dst) return reply.code(400).send({ ok: false, error: "src and dst required" });
+  try { return await nc.move(src, dst); } catch (err) { return reply.code(502).send({ ok: false, error: err.message }); }
+});
+app.post("/files/delete", async (req, reply) => {
+  const p = req.body && req.body.path;
+  if (!p) return reply.code(400).send({ ok: false, error: "path required" });
+  try { return await nc.remove(p); } catch (err) { return reply.code(502).send({ ok: false, error: err.message }); }
+});
+app.post("/files/share", async (req, reply) => {
+  const p = req.body && req.body.path;
+  if (!p) return reply.code(400).send({ ok: false, error: "path required" });
+  try { return await nc.shareLink(p, { password: req.body.password }); }
+  catch (err) { return reply.code(502).send({ ok: false, error: err.message }); }
+});
+app.get("/files/storage", async (req, reply) => {
+  try { return await nc.quota(); } catch (err) { return reply.code(502).send({ ok: false, error: err.message }); }
 });
 
 // Second-brain graph, straight from the Hermes brain_graph tool.

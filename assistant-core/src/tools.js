@@ -10,6 +10,7 @@ import { config } from "./config.js";
 import * as rag from "./rag.js";
 import { webSearch } from "./websearch.js";
 import { queryMetrics } from "./metrics.js";
+import * as ncfs from "./nextcloud.js";
 
 // Tools implemented in-process (no external HTTP hop).
 const BUILTINS = {
@@ -17,6 +18,13 @@ const BUILTINS = {
   web_search: (input) => webSearch(input || {}),
   query_metrics: (input) => queryMetrics(input || {}),
   create_plan: (input) => createPlan(input || {}),
+  // Nextcloud (Archivos)
+  list_files: (input) => ncfs.list((input && input.path) || ""),
+  create_folder: (input) => ncfs.mkdir(input && input.path),
+  move_file: (input) => ncfs.move(input && input.src, input && input.dst),
+  delete_file: (input) => ncfs.remove(input && input.path),
+  share_file: (input) => ncfs.shareLink(input && input.path, input || {}),
+  storage_usage: () => ncfs.quota(),
 };
 
 // Planning: create a parent task plus its subtasks in one step, reusing the
