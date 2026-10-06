@@ -48,6 +48,91 @@ An optional Kubernetes manifest is included in `hermes-agent/k8s/`.
 **See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for full component,
 communication, network-exposure, and Google-OAuth diagrams.**
 
+### Connection map (channels · LLMs · data · APIs)
+
+```mermaid
+flowchart LR
+  %% ── Clients ──
+  subgraph clients["Channels"]
+    DASH["Dashboard<br/>(browser)"]
+    WATCH["Galaxy Watch"]
+    TG["Telegram"]
+  end
+
+  %% ── Edge ──
+  subgraph edge["Tailscale edge (ocra-n8n)"]
+    SERVE{{"Serve :8443<br/>tailnet-only"}}
+    F10{{"Funnel :10000<br/>public"}}
+    F443{{"Funnel :443<br/>public"}}
+  end
+  DASH --> SERVE
+  WATCH --> F10
+  TG --> F443
+
+  %% ── Core services ──
+  subgraph core["Core services (Docker · Ocra)"]
+    AC["assistant-core<br/>Rebeca — agent loop + router"]
+    N8N["n8n<br/>Telegram router + tool webhooks"]
+    HERMES["Hermes gateway<br/>brain / fs / shell"]
+  end
+  SERVE --> AC
+  F10 --> AC
+  F443 --> N8N
+  N8N -->|"X-Internal-Token"| AC
+  AC -->|"localhost :8080"| HERMES
+  AC -->|"webhooks :5678"| N8N
+
+  %% ── LLMs ──
+  subgraph llm["LLMs (task router, local-first)"]
+    CLAUDE["Claude API<br/>claude-sonnet-5"]
+    OLLS["Ollama · Sadida<br/>qwen3.5 · qwen3 · deepseek-r1 · qwen2.5-coder · nomic-embed"]
+    OLLO["Ollama · omarchy<br/>deepseek-r1:8b · qwen2.5-coder:7b"]
+  end
+  AC -->|"HTTPS (complex)"| CLAUDE
+  AC -->|"/api/chat"| OLLS
+  AC -->|"/api/chat"| OLLO
+
+  %% ── Data stores ──
+  subgraph data["Data stores"]
+    PG[("PostgreSQL<br/>chat memory / sessions")]
+    QD[("Qdrant<br/>vectors — RAG")]
+  end
+  AC --> PG
+  AC --> QD
+  AC -->|"embeddings"| OLLS
+
+  %% ── Integrations / APIs ──
+  subgraph apis["Integrations & APIs"]
+    LINEAR["Linear API<br/>tasks · projects · subtasks"]
+    GCAL["Google Calendar API<br/>(OAuth2)"]
+    SX["SearXNG<br/>web search"]
+    NC["Nextcloud · Aery<br/>WebDAV / OCS"]
+    PROM["Prometheus<br/>homelab metrics"]
+  end
+  N8N -->|"GraphQL"| LINEAR
+  N8N -->|"OAuth2"| GCAL
+  AC -->|"JSON"| SX
+  AC -->|"WebDAV/OCS"| NC
+  AC -->|"PromQL"| PROM
+
+  %% ── Voice ──
+  subgraph voice["Voice (GPU hosts, failover)"]
+    WH["Whisper STT"]
+    PI["Piper TTS"]
+  end
+  AC -->|"audio"| WH
+  AC -->|"text"| PI
+
+  %% ── Second brain ──
+  subgraph brain["Second brain"]
+    VAULT["Git vault<br/>(Markdown)"]
+    GH[("GitHub")]
+  end
+  HERMES -->|"read/write + git push"| VAULT
+  VAULT --> GH
+  QD -. "indexes" .- VAULT
+```
+
 ---
 
 ## Components
