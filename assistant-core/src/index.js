@@ -372,13 +372,18 @@ app.post("/chat", async (req, reply) => {
   if (!session_id || !message) {
     return reply.code(400).send({ ok: false, error: "session_id and message are required" });
   }
-  const response = await runAgent({
-    sessionId: session_id,
-    channel: channel || "api",
-    userMessage: message,
-    model,
-  });
-  return { ok: true, response };
+  try {
+    const response = await runAgent({
+      sessionId: session_id,
+      channel: channel || "api",
+      userMessage: message,
+      model,
+    });
+    return { ok: true, response };
+  } catch (err) {
+    app.log.error("chat failed: " + err.message);
+    return { ok: false, error: err.message };
+  }
 });
 
 app.post("/chat/stream", async (req, reply) => {

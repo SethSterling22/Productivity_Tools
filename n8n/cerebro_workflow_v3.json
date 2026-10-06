@@ -59,6 +59,7 @@
         "inputDataFieldName": "data",
         "options": {}
       },
+      "onError": "continueRegularOutput",
       "id": "transcribe",
       "name": "Transcribe voice",
       "type": "n8n-nodes-base.httpRequest",
@@ -116,6 +117,7 @@
         "jsonBody": "={{ $json.requestBody }}",
         "options": { "timeout": 60000 }
       },
+      "onError": "continueRegularOutput",
       "id": "invoke-tool",
       "name": "Invoke tool (no AI)",
       "type": "n8n-nodes-base.httpRequest",
@@ -125,7 +127,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const r = $input.first().json;\nlet text;\nif (r && r.ok !== false) {\n  if (r.identifier) text = '\\u2705 Tarea creada: ' + r.identifier + ' \\u2014 ' + (r.title || '') + (r.url ? '\\n' + r.url : '');\n  else if (r.result) text = '\\u2705 ' + r.result;\n  else text = '\\u2705 Hecho.';\n} else {\n  text = '\\u26a0\\ufe0f Error: ' + ((r && r.error) || 'desconocido');\n}\nconst chat_id = $('Route').first().json.chat_id;\nreturn [{ json: { text, chat_id } }];"
+        "jsCode": "const r = $input.first().json || {};\nlet text;\nif (r.ok !== false && (r.identifier || r.result || r.ok === true)) {\n  if (r.identifier) text = '\\u2705 Tarea creada: ' + r.identifier + ' \\u2014 ' + (r.title || '') + (r.url ? '\\n' + r.url : '');\n  else if (r.result) text = '\\u2705 ' + r.result;\n  else text = '\\u2705 Hecho.';\n} else {\n  const e = r.error || 'desconocido';\n  const msg = (typeof e === 'string') ? e : (e.message || JSON.stringify(e));\n  text = '\\u26a0\\ufe0f Error: ' + String(msg).slice(0, 300);\n}\nconst chat_id = $('Route').first().json.chat_id;\nreturn [{ json: { text, chat_id } }];"
       },
       "id": "format-tool",
       "name": "Format tool reply",
@@ -146,6 +148,7 @@
         "jsonBody": "={{ $json.requestBody }}",
         "options": { "timeout": 120000 }
       },
+      "onError": "continueRegularOutput",
       "id": "rebeca-chat",
       "name": "Rebeca — chat",
       "type": "n8n-nodes-base.httpRequest",
@@ -155,7 +158,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const r = $input.first().json;\nlet text = (r && r.response) ? String(r.response) : '\\u26a0\\ufe0f Sin respuesta de Rebeca.';\ntext = text\n  .replace(/\\*\\*(.*?)\\*\\*/g, '$1')\n  .replace(/(^|\\n)#{1,6}\\s*/g, '$1')\n  .replace(/`{1,3}/g, '')\n  .replace(/^\\s*[-*]\\s+/gm, '\\u2022 ')\n  .trim();\nif (text.length > 4000) text = text.slice(0, 3990) + '\\u2026';\nconst chat_id = $('Route').first().json.chat_id;\nreturn [{ json: { text, chat_id } }];"
+        "jsCode": "const r = $input.first().json || {};\nlet text;\nif (r.response) {\n  text = String(r.response)\n    .replace(/\\*\\*(.*?)\\*\\*/g, '$1')\n    .replace(/(^|\\n)#{1,6}\\s*/g, '$1')\n    .replace(/`{1,3}/g, '')\n    .replace(/^\\s*[-*]\\s+/gm, '\\u2022 ')\n    .trim();\n  if (text.length > 4000) text = text.slice(0, 3990) + '\\u2026';\n} else {\n  const e = r.error || r.message || 'sin respuesta';\n  const msg = (typeof e === 'string') ? e : (e.message || JSON.stringify(e));\n  text = '\\u26a0\\ufe0f Error (Rebeca): ' + String(msg).slice(0, 300);\n}\nconst chat_id = $('Route').first().json.chat_id;\nreturn [{ json: { text, chat_id } }];"
       },
       "id": "format-reply",
       "name": "Format reply",

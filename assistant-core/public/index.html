@@ -603,7 +603,11 @@ async function send(opts) {
           const data = JSON.parse(line.slice(5).trim());
           clearTyping(); // first real event → stop showing the typing dots
           if (event === "tool_call") addTool(data.name, "→ llamando");
-          else if (event === "tool_result") addTool(data.name, "✓ resultado de");
+          else if (event === "tool_result") {
+            const bad = data.result && data.result.ok === false;
+            addTool(data.name, bad ? "⚠ falló" : "✓ resultado de");
+            if (bad && data.result.error) addMsg("assistant", "⚠ " + data.name + ": " + String(data.result.error).slice(0, 300));
+          }
           else if (event === "route") lastRoute = data.category;
           else if (event === "model") onModelUsed(data);
           else if (event === "text") { if (data.text) { finalText = data.text; if (!asstEl) asstEl = addMsg("assistant", ""); asstEl.innerHTML = renderMd(data.text); fixLinks(asstEl); messages.scrollTop = messages.scrollHeight; } }
