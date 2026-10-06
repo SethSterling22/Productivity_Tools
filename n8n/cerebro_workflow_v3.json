@@ -146,7 +146,7 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $json.requestBody }}",
-        "options": { "timeout": 120000 }
+        "options": { "timeout": 240000 }
       },
       "onError": "continueRegularOutput",
       "id": "rebeca-chat",
