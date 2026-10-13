@@ -195,6 +195,12 @@ services:
       - NEXTCLOUD_URL=${NEXTCLOUD_URL:-}
       - NEXTCLOUD_USER=${NEXTCLOUD_USER:-}
       - NEXTCLOUD_APP_PASSWORD=${NEXTCLOUD_APP_PASSWORD:-}
+      # Node SSH (hub terminal + run_on_node). OFF until the dedicated user + key
+      # exist on the nodes. NODES = JSON map name->host (tailnet).
+      - NODE_SSH_ENABLED=${NODE_SSH_ENABLED:-false}
+      - NODE_SSH_USER=${NODE_SSH_USER:-rebeca}
+      - NODE_SSH_KEY=/app/.ssh/nodes_key
+      - NODES=${NODES:-}
       # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).
       - ALLOWED_GOOGLE_EMAILS=${ALLOWED_GOOGLE_EMAILS:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
@@ -213,6 +219,8 @@ services:
       # Live tool manifest: edit + git pull to add tools; assistant-core hot-reloads
       # it (no rebuild needed for manifest-only changes).
       - ../assistant-core/tools.manifest.json:/app/tools.manifest.json:ro
+      # Node SSH key (read-only). Uncomment + set the host path when enabling SSH:
+      # - ${NODE_SSH_KEY_HOST}:/app/.ssh/nodes_key:ro
     depends_on:
       postgres:
         condition: service_healthy

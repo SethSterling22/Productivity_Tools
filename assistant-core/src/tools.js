@@ -11,6 +11,7 @@ import * as rag from "./rag.js";
 import { webSearch } from "./websearch.js";
 import { queryMetrics } from "./metrics.js";
 import * as ncfs from "./nextcloud.js";
+import * as sshmod from "./ssh.js";
 
 // Tools implemented in-process (no external HTTP hop).
 const BUILTINS = {
@@ -25,7 +26,27 @@ const BUILTINS = {
   delete_file: (input) => ncfs.remove(input && input.path),
   share_file: (input) => ncfs.shareLink(input && input.path, input || {}),
   storage_usage: () => ncfs.quota(),
+  // Nodes (SSH)
+  run_on_node: (input) => runOnNode(input || {}),
 };
+
+// Run a command on a node. Read-only commands run immediately; mutating commands
+// are refused unless `confirm:true` (the model must get the user's OK first).
+async function runOnNode(input) {
+  const node = input.node, command = input.command, confirm = input.confirm === true;
+  if (!node || !command) return { ok: false, error: "node and command are required" };
+  if (!sshmod.nodeNames().includes(node)) return { ok: false, error: `Unknown node '${node}'. Known: ${sshmod.nodeNames().join(", ")}` };
+  if (!sshmod.isReadOnly(command) && !confirm) {
+    return {
+      ok: false,
+      needs_confirmation: true,
+      node,
+      command,
+      message: "This command changes the node. Show the user the exact command and ask them to confirm; then call run_on_node again with confirm:true.",
+    };
+  }
+  return sshmod.execOnNode(node, command);
+}
 
 // Planning: create a parent task plus its subtasks in one step, reusing the
 // create_task tool (which returns the Linear issue id we use as the parent).

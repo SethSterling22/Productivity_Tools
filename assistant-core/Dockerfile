@@ -5,7 +5,9 @@ RUN addgroup -g 1002 assistant && adduser -u 1002 -G assistant -s /bin/sh -D ass
 
 WORKDIR /app
 COPY package.json ./
-RUN npm install --omit=dev
+# --omit=optional skips ssh2's native cpu-features build (not needed; pure-JS crypto
+# fallback works) so the image builds on alpine without python/make/g++.
+RUN npm install --omit=dev --omit=optional
 
 COPY src ./src
 COPY migrations ./migrations

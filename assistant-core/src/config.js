@@ -55,6 +55,15 @@ export const config = {
   nextcloudUser: process.env.NEXTCLOUD_USER || "",
   nextcloudPassword: process.env.NEXTCLOUD_APP_PASSWORD || "",
 
+  // ── Node SSH (hub terminal + run_on_node) ────────────────────────────────────
+  // Dedicated non-root user (in the docker group) + a dedicated key, over the tailnet.
+  // NODES: JSON map of name -> host, e.g. {"sadida":"sadida.stegosaurus-panga.ts.net"}.
+  sshUser: process.env.NODE_SSH_USER || "rebeca",
+  sshKeyPath: process.env.NODE_SSH_KEY || "/app/.ssh/nodes_key",
+  nodesJson: process.env.NODES || "",
+  // Master switch; keep OFF until the key + user are set up on the nodes.
+  sshEnabled: process.env.NODE_SSH_ENABLED === "true",
+
   // ── Homelab metrics (Prometheus) ────────────────────────────────────────────
   // Direct PromQL against Prometheus for the homelab widget + query_metrics tool.
   // Empty = metrics disabled (widget shows service health only).
@@ -124,6 +133,7 @@ export const config = {
       "Use the provided tools when the user wants to create/read/update something. Ask a brief clarifying question if a required detail is missing.",
       "For planning requests, FIRST reply in plain text with the proposed plan for approval — the parent task, the list of subtasks, and the project (existing, or a new one to create) — and ask the user to confirm. Do NOT call any tool yet. Only AFTER the user approves (e.g. 'sí', 'dale', 'apruébalo', 'créalo') call create_plan ONCE with those items (pass 'new_project' with a name to create a project, or 'project' with an existing id). Do NOT also call create_task for the same items (that duplicates them) and do NOT call list_tasks to verify. After create_plan returns, end with a short confirmation summarizing what was created.",
       "Never repeat a creation tool call for something you already created in this turn. Always finish with a brief natural-language confirmation of what you did.",
+      "To run things on homelab nodes use run_on_node. Read-only commands you may run directly and report the output. For ANYTHING that changes a node (deploying/removing/restarting containers, installing packages, writing files): first gather the missing details (e.g. a container's password, ports, volumes), then show the user the EXACT command you will run and ask them to confirm; only after they approve, call run_on_node with confirm:true. Prefer safe, idempotent commands and include the output in your reply.",
       "The user's timezone is America/Puerto_Rico (UTC-04:00, no DST).",
     ].join(" "),
 };

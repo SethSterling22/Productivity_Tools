@@ -8,6 +8,9 @@
 <script src="https://cdn.jsdelivr.net/npm/force-graph@1.43.5/dist/force-graph.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.11/purify.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/css/xterm.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm-addon-fit/0.8.0/xterm-addon-fit.min.js"></script>
 <style>
   :root {
     --bg: #0d0d0d; --panel: #151515; --panel2: #0f0f0f;
@@ -170,6 +173,23 @@
     transition: opacity .2s, transform .2s; max-width: 90vw; }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   /* language toggle */
+  .hdr-icon { margin-left: 12px; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; }
+  .hdr-icon:hover { color: var(--lime); }
+  .hdr-icon svg { width: 16px; height: 16px; display: block; }
+  @media (max-width: 859px) { .hdr-icon { display: none; } }
+  /* SSH terminal modal */
+  #sshWrap { display: none; position: fixed; inset: 0; z-index: 88; background: rgba(0,0,0,.6); }
+  #sshWrap.show { display: block; }
+  .sshmodal { position: absolute; top: 6vh; left: 50%; transform: translateX(-50%); width: min(900px, 95vw); height: 82vh;
+    display: flex; flex-direction: column; background: #0f0f0f; border: 1px solid var(--border-hi); box-shadow: 0 20px 60px rgba(0,0,0,.65); }
+  .ssh-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .ssh-head .t { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
+  .ssh-head select { background: var(--panel2); color: var(--text); border: 1px solid var(--border); font-family: var(--mono); font-size: 12px; padding: 4px 8px; outline: none; }
+  .ssh-head button { background: var(--lime); color: #0d0d0d; border: none; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 5px 12px; cursor: pointer; }
+  .ssh-head .st { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .ssh-head .x { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 16px; }
+  .ssh-head .x:hover { color: var(--coral); }
+  #sshTerm { flex: 1; min-height: 0; padding: 6px 8px; }
   #langToggle { margin-left: 10px; background: var(--panel2); color: var(--muted); border: 1px solid var(--border); font-family: var(--mono); font-size: 10px; padding: 3px 8px; cursor: pointer; letter-spacing: 1px; }
   #langToggle:hover { border-color: var(--border-hi); color: var(--text); }
   @media (max-width: 859px) { #langToggle { display: none; } }
@@ -373,6 +393,7 @@
         <button class="modelbtn" id="modelBtn" title="Modelo (auto = el router decide; clic para elegir)">auto · router</button>
         <div class="modelmenu" id="modelMenu"></div>
       </div>
+      <span id="sshBtn" class="hdr-icon" data-i18n-title="t_terminal" title="Node terminal (SSH)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 9l3 3-3 3"/><line x1="13" y1="15" x2="17" y2="15"/></svg></span>
       <button id="langToggle" title="Idioma / Language">ES</button>
       <button id="panelToggle" title="Panel" aria-label="Panel">☰</button>
     </div>
@@ -451,6 +472,19 @@
   <div id="overlay"></div>
   <div id="toast"></div>
 
+  <div id="sshWrap">
+    <div class="sshmodal" role="dialog" aria-label="SSH">
+      <div class="ssh-head">
+        <span class="t" data-i18n="ssh_title">Terminal — SSH</span>
+        <select id="sshNode"></select>
+        <button id="sshConnect" data-i18n="ssh_connect">Connect</button>
+        <span class="st" id="sshStatus"></span>
+        <span class="x" id="sshClose" title="Close">✕</span>
+      </div>
+      <div id="sshTerm"></div>
+    </div>
+  </div>
+
   <div id="paletteWrap">
     <div class="palette" role="dialog" aria-label="Acciones rápidas">
       <input id="paletteInput" data-i18n-ph="pal_ph" placeholder="Buscar acción…  (Esc para cerrar)" autocomplete="off" />
@@ -499,6 +533,7 @@ const I18N = {
     prio_normal: "Normal", prio_urgent: "Urgente", prio_high: "Alta", prio_low: "Baja", prio_none: "Sin prioridad",
     card_files: "Archivos", files_root: "inicio", files_empty: "Carpeta vacía.", files_unavailable: "Nextcloud no disponible.", files_del_confirm: "¿Borrar", files_newfolder_ph: "Nombre de la nueva carpeta…", files_link_copied: "Enlace copiado al portapapeles", files_link_fail: "No se pudo copiar — enlace:",
     t_upload: "Subir", t_newfolder: "Nueva carpeta", t_refresh: "Actualizar", t_download: "Descargar", t_share: "Compartir (copiar enlace)", t_delete: "Borrar", t_taskmgr: "Abrir gestor", t_search: "Buscar", t_center: "Centrar",
+    t_terminal: "Terminal de nodos (SSH)", ssh_connect: "Conectar", ssh_title: "Terminal — SSH", ssh_disabled: "SSH desactivado (NODE_SSH_ENABLED=true)", ssh_disconnected: "desconectado",
   },
   en: {
     send: "Send", card_events: "Upcoming events", card_tasks: "Tasks", card_homelab: "Homelab",
@@ -520,6 +555,7 @@ const I18N = {
     prio_normal: "Normal", prio_urgent: "Urgent", prio_high: "High", prio_low: "Low", prio_none: "No priority",
     card_files: "Files", files_root: "home", files_empty: "Empty folder.", files_unavailable: "Nextcloud unavailable.", files_del_confirm: "Delete", files_newfolder_ph: "New folder name…", files_link_copied: "Link copied to clipboard", files_link_fail: "Couldn't copy — link:",
     t_upload: "Upload", t_newfolder: "New folder", t_refresh: "Refresh", t_download: "Download", t_share: "Share (copy link)", t_delete: "Delete", t_taskmgr: "Open manager", t_search: "Search", t_center: "Center",
+    t_terminal: "Node terminal (SSH)", ssh_connect: "Connect", ssh_title: "Terminal — SSH", ssh_disabled: "SSH disabled (NODE_SSH_ENABLED=true)", ssh_disconnected: "disconnected",
   },
 };
 function t(k) { return (I18N[lang] && I18N[lang][k] !== undefined) ? I18N[lang][k] : (I18N.es[k] !== undefined ? I18N.es[k] : k); }
@@ -1153,6 +1189,42 @@ $("tmClose").onclick = () => $("taskModalWrap").classList.remove("show");
 $("tmReload").onclick = renderTaskManager;
 $("taskModalWrap").onclick = (e) => { if (e.target.id === "taskModalWrap") $("taskModalWrap").classList.remove("show"); };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("taskModalWrap").classList.remove("show"); });
+
+// ── SSH hub terminal (xterm + WebSocket) ──
+let sshWS = null, sshTerm = null, sshFit = null, sshBound = false;
+async function openSsh() {
+  $("sshWrap").classList.add("show");
+  let data = { enabled: false, nodes: [] };
+  try { data = await (await fetch(API + "/nodes")).json(); } catch {}
+  $("sshNode").innerHTML = (data.nodes || []).map((n) => "<option>" + esc(n) + "</option>").join("");
+  $("sshStatus").textContent = data.enabled ? "" : t("ssh_disabled");
+  if (!sshTerm && window.Terminal) {
+    sshTerm = new Terminal({ fontFamily: "ui-monospace, Menlo, Consolas, monospace", fontSize: 12, cursorBlink: true, theme: { background: "#0f0f0f", foreground: "#ededed", cursor: "#bcbf56" } });
+    if (window.FitAddon) { sshFit = new FitAddon.FitAddon(); sshTerm.loadAddon(sshFit); }
+    sshTerm.open($("sshTerm"));
+    if (!sshBound) { sshBound = true; sshTerm.onData((d) => { if (sshWS && sshWS.readyState === 1) sshWS.send(d); }); }
+  }
+  setTimeout(() => { if (sshFit) try { sshFit.fit(); } catch {} }, 60);
+}
+function sshSendResize() { if (sshWS && sshWS.readyState === 1 && sshTerm) sshWS.send(JSON.stringify({ __resize: [sshTerm.cols, sshTerm.rows] })); }
+function sshConnect() {
+  sshDisconnect();
+  const node = $("sshNode").value; if (!node || !sshTerm) return;
+  sshTerm.reset();
+  const url = location.origin.replace(/^http/, "ws") + "/ssh/" + encodeURIComponent(node);
+  sshWS = new WebSocket(url);
+  sshWS.onopen = () => { if (sshFit) try { sshFit.fit(); } catch {} sshSendResize(); sshTerm.focus(); $("sshStatus").textContent = "● " + node; };
+  sshWS.onmessage = (e) => sshTerm.write(typeof e.data === "string" ? e.data : new TextDecoder().decode(e.data));
+  sshWS.onclose = () => { $("sshStatus").textContent = t("ssh_disconnected"); };
+  sshWS.onerror = () => { $("sshStatus").textContent = "error"; };
+}
+function sshDisconnect() { if (sshWS) { try { sshWS.close(); } catch {} sshWS = null; } }
+function closeSsh() { sshDisconnect(); $("sshWrap").classList.remove("show"); }
+$("sshBtn").onclick = openSsh;
+$("sshConnect").onclick = sshConnect;
+$("sshClose").onclick = closeSsh;
+$("sshNode").onchange = () => { if (sshWS) sshConnect(); };
+window.addEventListener("resize", () => { if ($("sshWrap").classList.contains("show") && sshFit) { try { sshFit.fit(); } catch {} sshSendResize(); } });
 
 // ── Files (Nextcloud) widget ──
 let filesPath = "";

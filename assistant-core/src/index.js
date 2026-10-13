@@ -14,6 +14,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
+import websocket from "@fastify/websocket";
 import { config } from "./config.js";
 import { migrate, hasDb } from "./db.js";
 import { loadManifest, watchManifest, listTools, dispatch } from "./tools.js";
@@ -23,6 +24,7 @@ import * as memory from "./memory.js";
 import * as rag from "./rag.js";
 import { homelabPanels, metricsEnabled } from "./metrics.js";
 import * as nc from "./nextcloud.js";
+import * as ssh from "./ssh.js";
 import { authEnabled, loginUrl, exchangeCode, emailAllowed, secureCookies } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -82,6 +84,9 @@ app.get("/tools", async () => ({ tools: listTools() }));
 
 // Available models across hosts (for the manual model dropdown). Auto-discovered.
 app.get("/models", async () => ({ models: await listModels() }));
+
+// Homelab nodes available for the SSH hub terminal.
+app.get("/nodes", async () => ({ enabled: ssh.sshEnabled(), nodes: ssh.nodeNames() }));
 
 // Invoke a tool directly (used by the dashboard's task widget and command palette).
 // Behind the auth gate like the rest of the dashboard API.
@@ -420,7 +425,25 @@ async function start() {
   await app.register(cookie, { secret: config.sessionSecret });
   installAuthGate(); // after cookie plugin so req.cookies is populated
   await app.register(cors, { origin: true, credentials: true });
-  // Serve the dashboard SPA (tailnet-only; Google OAuth gate arrives in WS-E).
+  // WebSocket (hub terminal). Routes defined here, after the plugin is registered.
+  await app.register(websocket);
+  app.get("/ssh/:node", { websocket: true }, (socket, req) => {
+    const node = req.params.node;
+    const sh = ssh.openShell(node, {
+      cols: 100, rows: 30,
+      onData: (d) => { try { socket.send(d); } catch {} },
+      onClose: () => { try { socket.close(); } catch {} },
+      onError: (e) => { try { socket.send("\r\n[error] " + e.message + "\r\n"); socket.close(); } catch {} },
+    });
+    if (!sh) { try { socket.send("\r\n[SSH disabled or unknown node]\r\n"); socket.close(); } catch {} return; }
+    socket.on("message", (raw) => {
+      const s = raw.toString();
+      if (s.startsWith('{"__resize":')) { try { const r = JSON.parse(s).__resize; sh.resize(r[0], r[1]); return; } catch {} }
+      sh.write(s);
+    });
+    socket.on("close", () => sh.end());
+  });
+  // Serve the dashboard SPA (tailnet-only; behind the Google OAuth gate).
   await app.register(fastifyStatic, {
     root: path.join(__dirname, "..", "public"),
     prefix: "/",

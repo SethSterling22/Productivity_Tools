@@ -300,6 +300,23 @@
       "channels": ["dashboard", "telegram"],
       "category": "Archivos",
       "icon": "hard-drive"
+    },
+    {
+      "name": "run_on_node",
+      "description": "Run a shell command on a homelab node over SSH and return its output. Read-only commands (docker ps/images/logs/inspect/stats, ls, cat, df, free, nvidia-smi, systemctl status, journalctl, ps, etc.) run immediately. Any command that CHANGES a node (docker run/rm/stop/restart, apt/install, writing files, service restarts, etc.) is REFUSED unless you pass confirm:true — so you must first gather missing details (e.g. a container's password, ports, volumes), show the user the EXACT command, get their explicit approval, then call again with confirm:true. Report the output. Use for 'run docker ps on sadida', 'deploy a mysql container on omarchy', etc.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "node": { "type": "string", "description": "Node name: ocra, sadida, omarchy, aery, sram, sacro, xelor (and any others configured)." },
+          "command": { "type": "string", "description": "The exact shell command to run." },
+          "confirm": { "type": "boolean", "description": "Set true ONLY after the user explicitly approved a state-changing command." }
+        },
+        "required": ["node", "command"]
+      },
+      "endpoint": { "type": "builtin", "name": "run_on_node" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Nodos",
+      "icon": "terminal"
     }
   ]
 }
