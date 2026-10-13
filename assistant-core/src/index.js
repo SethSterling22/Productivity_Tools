@@ -199,8 +199,9 @@ app.get("/widgets/calendar", async () => {
 // panels (CPU/RAM/disk/GPU per node). Metrics section is empty if PROMETHEUS_URL
 // is unset; service health always works.
 const HEALTH_TIMEOUT = 1500;
+function hostLabel(u) { try { return new URL(u).hostname.split(".")[0]; } catch { return u; } }
 function svcTargets() {
-  return [
+  const t = [
     { name: "assistant-core", url: `http://127.0.0.1:${config.port}/health` },
     { name: "hermes", url: `${config.hermesUrl}/health` },
     { name: "n8n", url: "http://127.0.0.1:5678/healthz" },
@@ -208,9 +209,13 @@ function svcTargets() {
     { name: "searxng", url: `${config.searxngUrl}/healthz` },
     { name: "ollama:sadida", url: `${config.ollamaHosts.sadida}/api/tags` },
     { name: "ollama:omarchy", url: `${config.ollamaHosts.omarchy}/api/tags` },
-    { name: "whisper", url: `${config.whisperUrls[0]}/health` },
-    { name: "piper", url: `${config.piperUrls[0]}/health` },
   ];
+  // Whisper/Piper run on multiple GPU hosts (preference-ordered lists); show each
+  // host separately — like Ollama — so a down omarchy doesn't look like the whole
+  // voice service is off.
+  for (const u of config.whisperUrls) t.push({ name: "whisper:" + hostLabel(u), url: u + "/health" });
+  for (const u of config.piperUrls) t.push({ name: "piper:" + hostLabel(u), url: u + "/health" });
+  return t;
 }
 async function checkService(s) {
   const started = Date.now();
