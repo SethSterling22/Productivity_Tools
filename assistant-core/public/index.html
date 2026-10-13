@@ -537,7 +537,7 @@ const I18N = {
     prio_normal: "Normal", prio_urgent: "Urgente", prio_high: "Alta", prio_low: "Baja", prio_none: "Sin prioridad",
     card_files: "Archivos", files_root: "inicio", files_empty: "Carpeta vacía.", files_unavailable: "Nextcloud no disponible.", files_del_confirm: "¿Borrar", files_newfolder_ph: "Nombre de la nueva carpeta…", files_link_copied: "Enlace copiado al portapapeles", files_link_fail: "No se pudo copiar — enlace:",
     t_upload: "Subir", t_newfolder: "Nueva carpeta", t_refresh: "Actualizar", t_download: "Descargar", t_share: "Compartir (copiar enlace)", t_delete: "Borrar", t_taskmgr: "Abrir gestor", t_search: "Buscar", t_center: "Centrar",
-    t_terminal: "Terminal de nodos (SSH)", ssh_connect: "Conectar", ssh_title: "Terminal — SSH", ssh_disabled: "SSH desactivado (NODE_SSH_ENABLED=true)", ssh_disconnected: "desconectado",
+    t_terminal: "Terminal de nodos (SSH)", ssh_connect: "Conectar", ssh_title: "Terminal — SSH", ssh_disabled: "SSH desactivado (NODE_SSH_ENABLED=true)", ssh_connected: "conectado", ssh_disconnected: "desconectado",
   },
   en: {
     send: "Send", card_events: "Upcoming events", card_tasks: "Tasks", card_homelab: "Homelab",
@@ -559,7 +559,7 @@ const I18N = {
     prio_normal: "Normal", prio_urgent: "Urgent", prio_high: "High", prio_low: "Low", prio_none: "No priority",
     card_files: "Files", files_root: "home", files_empty: "Empty folder.", files_unavailable: "Nextcloud unavailable.", files_del_confirm: "Delete", files_newfolder_ph: "New folder name…", files_link_copied: "Link copied to clipboard", files_link_fail: "Couldn't copy — link:",
     t_upload: "Upload", t_newfolder: "New folder", t_refresh: "Refresh", t_download: "Download", t_share: "Share (copy link)", t_delete: "Delete", t_taskmgr: "Open manager", t_search: "Search", t_center: "Center",
-    t_terminal: "Node terminal (SSH)", ssh_connect: "Connect", ssh_title: "Terminal — SSH", ssh_disabled: "SSH disabled (NODE_SSH_ENABLED=true)", ssh_disconnected: "disconnected",
+    t_terminal: "Node terminal (SSH)", ssh_connect: "Connect", ssh_title: "Terminal — SSH", ssh_disabled: "SSH disabled (NODE_SSH_ENABLED=true)", ssh_connected: "connected", ssh_disconnected: "disconnected",
   },
 };
 function t(k) { return (I18N[lang] && I18N[lang][k] !== undefined) ? I18N[lang][k] : (I18N.es[k] !== undefined ? I18N.es[k] : k); }
@@ -1239,7 +1239,7 @@ function sshConnect() {
   sshTerm.reset();
   const url = location.origin.replace(/^http/, "ws") + "/ssh/" + encodeURIComponent(node);
   sshWS = new WebSocket(url);
-  sshWS.onopen = () => { if (sshFit) try { sshFit.fit(); } catch {} sshSendResize(); sshTerm.focus(); $("sshStatus").textContent = "● " + node; };
+  sshWS.onopen = () => { if (sshFit) try { sshFit.fit(); } catch {} sshSendResize(); sshTerm.focus(); $("sshStatus").innerHTML = '<span style="color:#5fd08a">●</span> ' + t("ssh_connected"); };
   sshWS.onmessage = (e) => sshTerm.write(typeof e.data === "string" ? e.data : new TextDecoder().decode(e.data));
   sshWS.onclose = () => { $("sshStatus").textContent = t("ssh_disconnected"); };
   sshWS.onerror = () => { $("sshStatus").textContent = "error"; };
