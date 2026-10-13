@@ -181,15 +181,20 @@
   #sshWrap { display: none; position: fixed; inset: 0; z-index: 88; background: rgba(0,0,0,.6); }
   #sshWrap.show { display: block; }
   .sshmodal { position: absolute; top: 6vh; left: 50%; transform: translateX(-50%); width: min(900px, 95vw); height: 82vh;
-    display: flex; flex-direction: column; background: #0f0f0f; border: 1px solid var(--border-hi); box-shadow: 0 20px 60px rgba(0,0,0,.65); }
-  .ssh-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel); }
-  .ssh-head .t { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
-  .ssh-head select { background: var(--panel2); color: var(--text); border: 1px solid var(--border); font-family: var(--mono); font-size: 12px; padding: 4px 8px; outline: none; }
-  .ssh-head button { background: var(--lime); color: #0d0d0d; border: none; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 5px 12px; cursor: pointer; }
+    display: flex; flex-direction: column; background: #0d0d0d; border: 1px solid var(--lime); box-shadow: 0 20px 60px rgba(0,0,0,.65); }
+  .ssh-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border-hi); background: var(--panel); flex-wrap: wrap; }
+  .ssh-head .t { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--lime); }
+  .ssh-nodes { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ssh-chip { display: flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid var(--border); padding: 3px 9px; font-family: var(--mono); font-size: 11px; cursor: pointer; color: var(--text); text-transform: lowercase; }
+  .ssh-chip:hover { border-color: var(--border-hi); }
+  .ssh-chip.active { border-color: var(--lime); color: var(--lime); }
+  .ssh-chip .d { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+  .ssh-chip .d.up { background: #5fd08a; } .ssh-chip .d.down { background: var(--coral); }
   .ssh-head .st { font-family: var(--mono); font-size: 11px; color: var(--muted); }
   .ssh-head .x { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 16px; }
   .ssh-head .x:hover { color: var(--coral); }
-  #sshTerm { flex: 1; min-height: 0; padding: 6px 8px; }
+  #sshTerm { flex: 1; min-height: 0; padding: 8px 10px; background: #0d0d0d; overflow: hidden; }
+  #sshTerm .xterm, #sshTerm .xterm-viewport { height: 100% !important; background: #0d0d0d !important; }
   #langToggle { margin-left: 10px; background: var(--panel2); color: var(--muted); border: 1px solid var(--border); font-family: var(--mono); font-size: 10px; padding: 3px 8px; cursor: pointer; letter-spacing: 1px; }
   #langToggle:hover { border-color: var(--border-hi); color: var(--text); }
   @media (max-width: 859px) { #langToggle { display: none; } }
@@ -476,8 +481,7 @@
     <div class="sshmodal" role="dialog" aria-label="SSH">
       <div class="ssh-head">
         <span class="t" data-i18n="ssh_title">Terminal — SSH</span>
-        <select id="sshNode"></select>
-        <button id="sshConnect" data-i18n="ssh_connect">Connect</button>
+        <div class="ssh-nodes" id="sshNodes"></div>
         <span class="st" id="sshStatus"></span>
         <span class="x" id="sshClose" title="Close">✕</span>
       </div>
@@ -1192,25 +1196,46 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("taskMod
 
 // ── SSH hub terminal (xterm + WebSocket) ──
 let sshWS = null, sshTerm = null, sshFit = null, sshBound = false;
+let sshSelected = null, sshNodesList = [], sshStatusMap = {}, sshStatusTimer = null;
+const SSH_THEME = {
+  background: "#0d0d0d", foreground: "#ededed", cursor: "#bcbf56", cursorAccent: "#0d0d0d", selectionBackground: "rgba(188,191,86,.25)",
+  black: "#151515", red: "#f27e63", green: "#bcbf56", yellow: "#d8d8d8", blue: "#71734c", magenta: "#bf6550", cyan: "#bcbf56", white: "#ededed",
+  brightBlack: "#8a8a80", brightRed: "#f27e63", brightGreen: "#bcbf56", brightYellow: "#ecee9a", brightBlue: "#9a9c66", brightMagenta: "#f27e63", brightCyan: "#bcbf56", brightWhite: "#ffffff",
+};
 async function openSsh() {
   $("sshWrap").classList.add("show");
-  let data = { enabled: false, nodes: [] };
-  try { data = await (await fetch(API + "/nodes")).json(); } catch {}
-  $("sshNode").innerHTML = (data.nodes || []).map((n) => "<option>" + esc(n) + "</option>").join("");
-  $("sshStatus").textContent = data.enabled ? "" : t("ssh_disabled");
-  if (!window.Terminal) { $("sshStatus").textContent = "xterm no cargó (CDN)"; return; }
-  if (!sshTerm && window.Terminal) {
-    sshTerm = new Terminal({ fontFamily: "ui-monospace, Menlo, Consolas, monospace", fontSize: 12, cursorBlink: true, theme: { background: "#0f0f0f", foreground: "#ededed", cursor: "#bcbf56" } });
+  if (!window.Terminal) { $("sshNodes").innerHTML = '<span class="st">xterm no cargó (CDN)</span>'; return; }
+  if (!sshTerm) {
+    sshTerm = new Terminal({ fontFamily: '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace', fontSize: 12.5, cursorBlink: true, theme: SSH_THEME, scrollback: 2000 });
     if (window.FitAddon) { sshFit = new FitAddon.FitAddon(); sshTerm.loadAddon(sshFit); }
     sshTerm.open($("sshTerm"));
     if (!sshBound) { sshBound = true; sshTerm.onData((d) => { if (sshWS && sshWS.readyState === 1) sshWS.send(d); }); }
   }
-  setTimeout(() => { if (sshFit) try { sshFit.fit(); } catch {} }, 60);
+  await loadSshNodes();
+  if (sshStatusTimer) clearInterval(sshStatusTimer);
+  sshStatusTimer = setInterval(refreshSshStatus, 15000);
+  setTimeout(() => { if (sshFit) try { sshFit.fit(); sshSendResize(); } catch {} }, 60);
+}
+function renderSshChips() {
+  $("sshNodes").innerHTML = sshNodesList.map((n) => {
+    const up = sshStatusMap[n];
+    const dot = "d " + (up === true ? "up" : up === false ? "down" : "");
+    return '<span class="ssh-chip' + (n === sshSelected ? " active" : "") + '" data-n="' + esc(n) + '"><span class="' + dot + '"></span>' + esc(n) + "</span>";
+  }).join("");
+  $("sshNodes").querySelectorAll(".ssh-chip").forEach((el) => el.onclick = () => { sshSelected = el.dataset.n; renderSshChips(); sshConnect(); });
+}
+async function loadSshNodes() {
+  try { const d = await (await fetch(API + "/nodes")).json(); if (!d.enabled) { $("sshNodes").innerHTML = '<span class="st">' + t("ssh_disabled") + "</span>"; return; } sshNodesList = d.nodes || []; } catch { return; }
+  await refreshSshStatus();
+}
+async function refreshSshStatus() {
+  try { sshStatusMap = (await (await fetch(API + "/nodes/status")).json()).status || {}; } catch {}
+  renderSshChips();
 }
 function sshSendResize() { if (sshWS && sshWS.readyState === 1 && sshTerm) sshWS.send(JSON.stringify({ __resize: [sshTerm.cols, sshTerm.rows] })); }
 function sshConnect() {
   sshDisconnect();
-  const node = $("sshNode").value; if (!node || !sshTerm) return;
+  const node = sshSelected; if (!node || !sshTerm) return;
   sshTerm.reset();
   const url = location.origin.replace(/^http/, "ws") + "/ssh/" + encodeURIComponent(node);
   sshWS = new WebSocket(url);
@@ -1220,11 +1245,9 @@ function sshConnect() {
   sshWS.onerror = () => { $("sshStatus").textContent = "error"; };
 }
 function sshDisconnect() { if (sshWS) { try { sshWS.close(); } catch {} sshWS = null; } }
-function closeSsh() { sshDisconnect(); $("sshWrap").classList.remove("show"); }
+function closeSsh() { sshDisconnect(); if (sshStatusTimer) { clearInterval(sshStatusTimer); sshStatusTimer = null; } $("sshWrap").classList.remove("show"); }
 $("sshBtn").onclick = openSsh;
-$("sshConnect").onclick = sshConnect;
 $("sshClose").onclick = closeSsh;
-$("sshNode").onchange = () => { if (sshWS) sshConnect(); };
 window.addEventListener("resize", () => { if ($("sshWrap").classList.contains("show") && sshFit) { try { sshFit.fit(); } catch {} sshSendResize(); } });
 
 // ── Files (Nextcloud) widget ──

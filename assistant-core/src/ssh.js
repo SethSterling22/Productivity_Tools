@@ -7,6 +7,7 @@
 // (see isReadOnly + run_on_node). Everything stays OFF until NODE_SSH_ENABLED=true.
 
 import fs from "node:fs";
+import net from "node:net";
 import { Client } from "ssh2";
 import { config } from "./config.js";
 
@@ -26,6 +27,25 @@ export function nodes() {
 }
 export function nodeNames() { return Object.keys(nodes()); }
 export function sshEnabled() { return config.sshEnabled; }
+
+// Quick TCP reachability check to a node's SSH port (no auth) — for status lights.
+function ping(host, port = 22, timeout = 1500) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host, port });
+    let done = false;
+    const fin = (up) => { if (!done) { done = true; try { s.destroy(); } catch {} resolve(up); } };
+    s.setTimeout(timeout);
+    s.on("connect", () => fin(true));
+    s.on("timeout", () => fin(false));
+    s.on("error", () => fin(false));
+  });
+}
+export async function nodeStatus() {
+  const n = nodes();
+  const out = {};
+  await Promise.all(Object.entries(n).map(async ([name, host]) => { out[name] = await ping(host); }));
+  return out;
+}
 
 function privateKey() {
   return fs.readFileSync(config.sshKeyPath);

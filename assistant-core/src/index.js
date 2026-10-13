@@ -87,6 +87,8 @@ app.get("/models", async () => ({ models: await listModels() }));
 
 // Homelab nodes available for the SSH hub terminal.
 app.get("/nodes", async () => ({ enabled: ssh.sshEnabled(), nodes: ssh.nodeNames() }));
+// Live reachability (TCP :22) of each node, for the status lights.
+app.get("/nodes/status", async () => ({ status: await ssh.nodeStatus() }));
 
 // Invoke a tool directly (used by the dashboard's task widget and command palette).
 // Behind the auth gate like the rest of the dashboard API.
