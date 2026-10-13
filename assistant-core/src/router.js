@@ -52,10 +52,22 @@ const GREET_RE = /^(hola+|hey|buenas|buenos días|buenos dias|buenas tardes|buen
 // it must produce a clean parent + subtasks and a confirmation in one pass.
 const PLAN_RE = /\b(planifi\w+|planea\w*|plan de|haz un plan|hagamos un plan|desglos\w+|divide (esto )?en (tareas|pasos|subtareas)|hoja de ruta|roadmap|breakdown|organiza\w* (un|el) proyecto)\b/i;
 
+// Explicit tool invocation (dashboard inserts "/tool …") or a command aimed at a
+// homelab node must go to a reliable tool-calling model (Claude), not a small coder
+// that may hallucinate instead of invoking the tool.
+const NODES_RE = /\b(ocra|sadida|omarchy|aery|sram|sacro|xelor)\b/i;
+const INFRA_RE = /\b(docker|contenedor|container|servicio|service|ejecut\w*|corr\w*|comando|command|systemctl|journalctl|nvidia|deploy|despliega|instala|levanta|reinicia|run_on_node)\b/i;
+
 export function classify(message) {
   const m = (message || "").trim();
   const len = m.length;
-  if (PLAN_RE.test(m)) return "complex";     // planning -> Claude first
+  // Planning composes new structure -> Claude (the "invent it" case).
+  if (PLAN_RE.test(m)) return "complex";
+  // Explicit tool calls and node commands -> the LOCAL tool model (qwen3.5:4b),
+  // NOT the coder. Claude is only the automatic fallback if the local model fails,
+  // or if you force it from the model dropdown. Keeps Claude optional.
+  if (m.startsWith("/")) return "general";
+  if (/\brun_on_node\b/i.test(m) || (NODES_RE.test(m) && INFRA_RE.test(m))) return "general";
   if (CODE_RE.test(m)) return "coding";
   if (REASON_RE.test(m)) return "reasoning";
   if (len > 800) return "complex";           // long, likely needs the strongest model
