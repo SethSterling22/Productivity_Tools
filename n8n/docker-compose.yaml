@@ -220,7 +220,7 @@ services:
       # it (no rebuild needed for manifest-only changes).
       - ../assistant-core/tools.manifest.json:/app/tools.manifest.json:ro
       # Node SSH key (read-only). Uncomment + set the host path when enabling SSH:
-      # - ${NODE_SSH_KEY_HOST}:/app/.ssh/nodes_key:ro
+      - ${NODE_SSH_KEY_HOST}:/app/.ssh/nodes_key:ro
     depends_on:
       postgres:
         condition: service_healthy
