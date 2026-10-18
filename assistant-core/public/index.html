@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>REBECA</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <script src="https://cdn.jsdelivr.net/npm/force-graph@1.43.5/dist/force-graph.min.js"></script>
@@ -21,7 +21,7 @@
     --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
+  html, body { margin: 0; height: 100%; max-width: 100%; overflow-x: hidden; }
   body {
     background: var(--bg); color: var(--text);
     font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -30,7 +30,7 @@
   ::selection { background: var(--lime); color: #0d0d0d; }
 
   /* ── Chat column ── */
-  .chat { display: flex; flex-direction: column; border-right: 1px solid var(--border); min-height: 0; }
+  .chat { display: flex; flex-direction: column; border-right: 1px solid var(--border); min-height: 0; min-width: 0; overflow: hidden; }
   .brand {
     padding: 16px 18px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 12px;
@@ -48,8 +48,8 @@
   .dot.ok { background: var(--ok); }
   .dot.err { background: var(--err); }
 
-  .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-  .msg { max-width: 84%; padding: 11px 14px; white-space: pre-wrap; word-wrap: break-word; border-radius: 0; }
+  .messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .msg { max-width: 84%; padding: 11px 14px; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; border-radius: 0; min-width: 0; }
   .msg.user { align-self: flex-end; background: var(--coral); color: #0d0d0d; font-weight: 500; }
   .msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-left: 2px solid var(--lime); }
   .msg a { color: var(--lime); text-underline-offset: 2px; }
@@ -64,14 +64,15 @@
   .msg.assistant h3 { font-size: 14px; } .msg.assistant h4 { font-size: 13px; color: var(--muted); }
   .msg.assistant ul, .msg.assistant ol { margin: 6px 0; padding-left: 20px; }
   .msg.assistant li { margin: 2px 0; }
-  .msg.assistant code { background: var(--panel2); border: 1px solid var(--border); padding: 1px 5px; font-family: var(--mono); font-size: 12px; }
-  .msg.assistant pre { background: var(--panel2); border: 1px solid var(--border); padding: 10px 12px; overflow-x: auto; margin: 8px 0; }
-  .msg.assistant pre code { border: none; padding: 0; background: none; }
+  .msg.assistant code { background: var(--panel2); border: 1px solid var(--border); padding: 1px 5px; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+  .msg.assistant pre { background: var(--panel2); border: 1px solid var(--border); padding: 10px 12px; overflow-x: auto; margin: 8px 0; max-width: 100%; }
+  .msg.assistant pre code { border: none; padding: 0; background: none; white-space: pre; overflow-wrap: normal; }
   .msg.assistant blockquote { border-left: 2px solid var(--olive); margin: 8px 0; padding-left: 10px; color: var(--muted); }
   .msg.assistant hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
-  .msg.assistant table { border-collapse: collapse; margin: 8px 0; font-size: 13px; display: block; overflow-x: auto; }
+  .msg.assistant table { border-collapse: collapse; margin: 8px 0; font-size: 13px; display: block; overflow-x: auto; max-width: 100%; }
   .msg.assistant th, .msg.assistant td { border: 1px solid var(--border-hi); padding: 5px 9px; text-align: left; }
   .msg.assistant th { background: var(--panel2); color: var(--lime); font-weight: 600; white-space: nowrap; }
+  .msg.assistant td { overflow-wrap: anywhere; }
   .tool {
     align-self: flex-start; font-size: 11px; color: var(--muted); background: var(--panel2);
     border: 1px solid var(--border); padding: 4px 10px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .5px;
@@ -269,7 +270,8 @@
     }
     .side.open { transform: translateX(0); }
     .messages { padding: 14px; }
-    .msg { max-width: 92%; }
+    .msg { max-width: calc(100vw - 28px); }
+    .msg.assistant table { font-size: 12px; }
     #graph { height: 200px; }
     .composer { gap: 6px; padding: 10px; }
     .composer button { padding: 0 12px; }
