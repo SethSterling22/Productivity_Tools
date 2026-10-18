@@ -13,7 +13,7 @@ provides low-level brain/fs/shell tools.
 > **Architecture, communication diagrams, network exposure (Tailscale Serve /
 > Funnel), and the Google OAuth flow are documented in
 > [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).** The evolution plan lives in
-> [`docs/JARVIS_ROADMAP.md`](docs/JARVIS_ROADMAP.md).
+> [`docs/REBECA_ROADMAP.md`](docs/REBECA_ROADMAP.md).
 
 This repository is meant to be **reasonably portable**: the code and workflows
 are wired to a specific home lab today, but every infrastructure-specific value
@@ -149,7 +149,7 @@ flowchart LR
 | **Dashboard** | `assistant-core/public/index.html` | Web UI: streaming chat (markdown), push-to-talk voice, model picker, slash-command autocomplete, tasks, files, homelab status, brain graph, SSH terminal, ES/EN. Tailnet-only (Serve `:8443`). |
 | **Watch UI** | `assistant-core/public/watch.html` | Voice-first circular UI for the Galaxy Watch. Public Funnel `:10000` + watch token. |
 | **Tool manifest** | `assistant-core/tools.manifest.json` | Declares every capability (with `category`); hot-reloaded. See `docs/ADDING_A_TOOL.md`. |
-| **n8n cerebro (v3)** | `n8n/cerebro_workflow_v3.json` | Telegram entry point — hybrid thrifty router (see below). `cerebro_workflow_v2.json` is the legacy version. |
+| **n8n Brain workflow (v3)** | `n8n/cerebro_workflow_v3.json` | Telegram entry point — hybrid thrifty router (see below). `cerebro_workflow_v2.json` is the legacy version. |
 | **n8n tool workflows** | `n8n/tools/` | Webhook sub-workflows: `assistant_tools` (task/event), `linear_tasks` (list/projects/update/complete/create_project), `linear_whoami`, `_template`. |
 | **Hermes gateway** | `hermes-agent/mcp-server/gateway.js` | HTTP server on `:8080`; brain/fs/shell tools via `POST /tool/:name`. |
 | **Hermes MCP server** | `hermes-agent/mcp-server/server.js` | Native stdio MCP server (same tools) for MCP-native clients. |
@@ -170,7 +170,7 @@ toggles (see `n8n/.env.example`).
 Two layers of routing, both built to **use the cheapest thing that works** and keep
 the paid model as a last resort.
 
-### 1. Telegram entry (cerebro v3 — hybrid)
+### 1. Telegram entry (Brain workflow v3 — hybrid)
 
 ```
 /task, /note                 → DETERMINISTIC, zero AI (dispatched straight to the tool)
@@ -207,12 +207,12 @@ Every capability is a descriptor in `tools.manifest.json`, grouped by `category`
 | Category | Tools | Backend |
 | --- | --- | --- |
 | **Linear** | `create_task`, `create_plan`, `create_project`, `list_tasks`, `list_projects`, `update_task`, `complete_task` | Linear GraphQL via n8n (+ a `create_plan` builtin that composes parent + subtasks) |
-| **Calendario** | `create_event`, `list_today_events` | Google Calendar via n8n (OAuth2) |
-| **Notas / Brain** | `save_note`, `search_brain`, `search_brain_semantic` | Hermes → git vault; RAG via Qdrant + Ollama embeddings |
+| **Calendar** | `create_event`, `list_today_events` | Google Calendar via n8n (OAuth2) |
+| **Notes / Brain** | `save_note`, `search_brain`, `search_brain_semantic` | Hermes → git vault; RAG via Qdrant + Ollama embeddings |
 | **Web** | `web_search` | Self-hosted SearXNG |
 | **Homelab** | `query_metrics` | Prometheus (PromQL) |
-| **Archivos** | `list_files`, `create_folder`, `move_file`, `delete_file`, `share_file`, `storage_usage` | Nextcloud (WebDAV + OCS) |
-| **Nodos** | `run_on_node` | SSH (ssh2) to homelab nodes as the dedicated `rebeca` user |
+| **Files** | `list_files`, `create_folder`, `move_file`, `delete_file`, `share_file`, `storage_usage` | Nextcloud (WebDAV + OCS) |
+| **Nodes** | `run_on_node` | SSH (ssh2) to homelab nodes as the dedicated `rebeca` user |
 
 Behavioral guardrails: **planning** proposes the plan and waits for approval before
 creating anything; **`run_on_node`** runs read-only commands directly but refuses
@@ -320,7 +320,7 @@ Productivity_Tools/
 │   └── .env.example
 ├── voice-services/           # whisper/ + piper/ (GPU hosts)
 ├── searxng/settings.yml      # self-hosted web search
-├── docs/                     # ARCHITECTURE, JARVIS_ROADMAP, MODEL_ROUTING,
+├── docs/                     # ARCHITECTURE, REBECA_ROADMAP, MODEL_ROUTING,
 │                             #   ADDING_A_TOOL, FILES_NEXTCLOUD_PLAN, STATE_OF_THE_ART_2026
 └── hermes-agent/
     ├── mcp-server/           # gateway.js, server.js, Dockerfile, package.json
@@ -335,7 +335,7 @@ Productivity_Tools/
 | Doc | What's in it |
 | --- | --- |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Components, communication diagrams, network exposure, Google OAuth + token flows, tool dispatch, data stores. |
-| [`docs/JARVIS_ROADMAP.md`](docs/JARVIS_ROADMAP.md) | Phases, what's done, what's next. |
+| [`docs/REBECA_ROADMAP.md`](docs/REBECA_ROADMAP.md) | Phases, what's done, what's next. |
 | [`docs/MODEL_ROUTING.md`](docs/MODEL_ROUTING.md) | Task-specialized model routing, hosts, installed models, tuning. |
 | [`docs/ADDING_A_TOOL.md`](docs/ADDING_A_TOOL.md) | How to add a capability (n8n webhook / Hermes / builtin / http). |
 | [`docs/FILES_NEXTCLOUD_PLAN.md`](docs/FILES_NEXTCLOUD_PLAN.md) | Files integration + the node-distribution plan. |

@@ -81,7 +81,7 @@ sudo docker logs hermes_gateway | tail
 ## 6. n8n workflow
 
 1. Open `https://ocra.stegosaurus-panga.ts.net`.
-2. Import `n8n/cerebro_workflow_v2.json`.
+2. Import `n8n/cerebro_workflow_v3.json` (the current Brain workflow) and the sub-workflows in `n8n/tools/`.
 3. Connect the Telegram bot credential (the token lives in n8n, not in `.env`).
 4. Activate the workflow.
 

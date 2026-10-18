@@ -111,7 +111,7 @@ React + Vite. Served by its own container (nginx) or by assistant-core; **tailne
 
 ## WS-F — Telegram delegation
 
-- **F1. Route free-text to assistant-core.** In the cerebro workflow, send
+- **F1. Route free-text to assistant-core.** In the Brain workflow, send
   non-command / chat intents to assistant-core (`POST /chat`) using `chat_id` as
   `session_id`, instead of the current direct Ollama chat. Slash-commands unchanged
   (Router).

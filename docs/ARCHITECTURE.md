@@ -1,4 +1,4 @@
-# Architecture — Rebeca / Cerebro
+# Architecture — Rebeca
 
 How the personal-assistant stack is wired today: the components, how each one
 talks to the others, how it's exposed on the network, and how authentication and
@@ -151,7 +151,7 @@ sadida as fallback**. Tool calls are dispatched by type (§6).
 sequenceDiagram
   participant TG as Telegram
   participant F as Funnel :443
-  participant N as n8n (cerebro workflow)
+  participant N as n8n (Brain workflow)
   participant AC as assistant-core
   participant W as Whisper
   TG->>F: webhook (message)

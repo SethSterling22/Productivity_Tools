@@ -21,7 +21,7 @@
     },
     {
       "name": "create_plan",
-      "description": "Plan a goal by creating a parent task plus its subtasks in Linear in one step. Use when the user wants to 'planificar', break a goal into steps, or create a task that has several subtasks at once. Provide the parent 'title' and a 'subtasks' array of titles. To file the plan under a project: pass an existing project id as 'project', OR pass 'new_project' with a name to create a new project for it.",
+      "description": "Plan a goal by creating a parent task plus its subtasks in Linear in one step. Use when the user wants to plan something, break a goal into steps, or create a task that has several subtasks at once. Provide the parent 'title' and a 'subtasks' array of titles. To file the plan under a project: pass an existing project id as 'project', OR pass 'new_project' with a name to create a new project for it.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -128,7 +128,7 @@
       },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/create_event" },
       "channels": ["dashboard", "telegram"],
-      "category": "Calendario",
+      "category": "Calendar",
       "icon": "calendar-plus"
     },
     {
@@ -137,7 +137,7 @@
       "input_schema": { "type": "object", "properties": {} },
       "endpoint": { "type": "n8n_webhook", "path": "/tool/list_today_events" },
       "channels": ["dashboard", "telegram"],
-      "category": "Calendario",
+      "category": "Calendar",
       "icon": "calendar"
     },
     {
@@ -155,7 +155,7 @@
       },
       "endpoint": { "type": "hermes_tool", "path": "/tool/note_save" },
       "channels": ["dashboard", "telegram"],
-      "category": "Notas / Brain",
+      "category": "Notes / Brain",
       "icon": "file-plus"
     },
     {
@@ -170,7 +170,7 @@
       },
       "endpoint": { "type": "hermes_tool", "path": "/tool/brain_list" },
       "channels": ["dashboard", "telegram"],
-      "category": "Notas / Brain",
+      "category": "Notes / Brain",
       "icon": "folder-tree"
     },
     {
@@ -186,7 +186,7 @@
       },
       "endpoint": { "type": "builtin", "name": "search_brain_semantic" },
       "channels": ["dashboard", "telegram"],
-      "category": "Notas / Brain",
+      "category": "Notes / Brain",
       "icon": "search"
     },
     {
@@ -231,7 +231,7 @@
       },
       "endpoint": { "type": "builtin", "name": "list_files" },
       "channels": ["dashboard", "telegram"],
-      "category": "Archivos",
+      "category": "Files",
       "icon": "folder"
     },
     {
@@ -244,7 +244,7 @@
       },
       "endpoint": { "type": "builtin", "name": "create_folder" },
       "channels": ["dashboard", "telegram"],
-      "category": "Archivos",
+      "category": "Files",
       "icon": "folder-plus"
     },
     {
@@ -260,7 +260,7 @@
       },
       "endpoint": { "type": "builtin", "name": "move_file" },
       "channels": ["dashboard", "telegram"],
-      "category": "Archivos",
+      "category": "Files",
       "icon": "move"
     },
     {
@@ -273,7 +273,7 @@
       },
       "endpoint": { "type": "builtin", "name": "delete_file" },
       "channels": ["dashboard", "telegram"],
-      "category": "Archivos",
+      "category": "Files",
       "icon": "trash"
     },
     {
@@ -289,7 +289,7 @@
       },
       "endpoint": { "type": "builtin", "name": "share_file" },
       "channels": ["dashboard", "telegram"],
-      "category": "Archivos",
+      "category": "Files",
       "icon": "link"
     },
     {
@@ -298,7 +298,7 @@
       "input_schema": { "type": "object", "properties": {} },
       "endpoint": { "type": "builtin", "name": "storage_usage" },
       "channels": ["dashboard", "telegram"],
-      "category": "Archivos",
+      "category": "Files",
       "icon": "hard-drive"
     },
     {
@@ -315,7 +315,7 @@
       },
       "endpoint": { "type": "builtin", "name": "run_on_node" },
       "channels": ["dashboard", "telegram"],
-      "category": "Nodos",
+      "category": "Nodes",
       "icon": "terminal"
     }
   ]

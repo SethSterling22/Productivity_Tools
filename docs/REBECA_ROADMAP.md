@@ -1,6 +1,6 @@
-# Jarvis Roadmap — Cerebro Personal Assistant
+# Rebeca Roadmap — Personal Assistant
 
-Evolving the Telegram-driven "Cerebro" into a multi-channel, voice-capable,
+Evolving the Telegram-driven "Brain" into a multi-channel, voice-capable,
 productivity-focused personal assistant with a self-hosted dashboard.
 
 Owner: Sebastian Sterling (DevSecOps, Expert Radiology).
@@ -14,7 +14,7 @@ Tailscale, NFS, GPU provisioning) is out of scope and owned separately.
 
 - **Voice backend:** self-hosted. Whisper (STT) + Piper (TTS), running on the GPU
   node (Sadida). Private, no per-use cost, consistent with the local-first stack.
-- **Voice activation:** both, phased — push-to-talk first, wake word ("Hey Jarvis")
+- **Voice activation:** both, phased — push-to-talk first, wake word ("Hey Rebeca")
   later.
 - **First milestone:** dashboard + interactive text chat.
 
@@ -32,7 +32,7 @@ voice note.
 ```
                          ┌──────────────────────────────┐
    Telegram  ───────────▶│            n8n                │  (integration hub:
-   (text + voice notes)  │  cerebro workflow + tool      │   Linear, Google
+   (text + voice notes)  │  Brain workflow + tool        │   Linear, Google
                          │  sub-workflows via webhooks   │   Calendar, brain, …)
                          └───────────────┬──────────────┘
                                          │  (tool calls / results)
@@ -66,7 +66,7 @@ voice note.
   the same tools** via the manifest. See §10 for the rationale.
 - **n8n:** stays the **tool execution / integration hub**. Each capability is an
   n8n sub-workflow behind a Webhook trigger. Adding an integration = add a
-  sub-workflow + a manifest entry (see §4). The existing cerebro workflow keeps
+  sub-workflow + a manifest entry (see §4). The existing Brain workflow keeps
   handling the Telegram trigger and the Router.
 - **Hermes gateway:** unchanged role — provides `claude_chat`, `ollama_chat`,
   brain read/write tools, and gets a new `brain_graph` tool. assistant-core uses
@@ -83,7 +83,7 @@ voice note.
 | Interactive text chat (streaming) | Dashboard, Telegram | assistant-core + Hermes LLM |
 | Voice input | Dashboard (mic), Telegram (voice notes) | Whisper |
 | Voice output | Dashboard, Telegram (optional) | Piper |
-| Wake word "Hey Jarvis" | Dashboard | openWakeWord (browser) |
+| Wake word "Hey Rebeca" | Dashboard | openWakeWord (browser) |
 | Second-brain graph | Dashboard | `brain_graph` (Hermes) + force-graph |
 | Today's calendar | Dashboard, Telegram (/calendar) | Google Calendar via n8n |
 | Capabilities / status panel | Dashboard | tool manifest + health checks |
@@ -161,7 +161,7 @@ that makes the assistant "adapt easily to any future n8n tool."
   Rolling window of recent turns kept in Postgres (already running) or Redis.
 - **Long-term (Phase 3):** semantic memory over the brain vault — embed notes
   (Ollama embeddings), store vectors, and retrieve relevant notes to ground answers
-  (RAG). Lets Jarvis answer "what did I decide about X?" from your own notes.
+  (RAG). Lets Rebeca answer "what did I decide about X?" from your own notes.
   **Vector store: Qdrant** (chosen — runs as a container on the homelab; also a good
   chance to practice a production-grade vector DB). It scales well, offers rich
   payload filtering and snapshots, and exposes a clean REST/gRPC API. Trade-off vs.
@@ -193,7 +193,7 @@ that makes the assistant "adapt easily to any future n8n tool."
 - Calendar widget (today's Google Calendar events).
 - Second-brain graph widget (force-directed, from `brain_graph`).
 - Capabilities/status panel (from the manifest + service health checks).
-- Wire Telegram's cerebro workflow to delegate "chat" intents to assistant-core so
+- Wire Telegram's Brain workflow to delegate "chat" intents to assistant-core so
   both channels share one brain.
 
 ### Phase 2 — Voice  ✅ DONE (input side)
@@ -204,7 +204,7 @@ that makes the assistant "adapt easily to any future n8n tool."
 - Internal token (X-Internal-Token) lets n8n bypass the dashboard OAuth gate.
 - Pending (optional): Telegram *voice* reply (Rebeca answers with a Piper voice note).
 
-### Phase 3 — Jarvis polish  (partially DONE)
+### Phase 3 — Assistant polish  (partially DONE)
 - ✅ **Long-term memory / RAG** over the brain: Qdrant + Ollama embeddings
   (nomic-embed-text), `search_brain_semantic` builtin tool, `POST /brain/reindex`.
 - ✅ **Dashboard sessions**: history restored on reload, conversation switcher
@@ -222,7 +222,7 @@ that makes the assistant "adapt easily to any future n8n tool."
 - ✅ Manifest bind-mounted + hot-reloaded → add a tool by editing the manifest +
   `git pull`, no rebuild for manifest-only changes.
 - ⬜ Optional cleanup: delete the now-orphaned "Hermes — Classify intent" node in
-  the cerebro workflow (free-text goes to Rebeca now).
+  the Brain workflow (free-text goes to Rebeca now).
 - ⬜ Optional: auto-generate the manifest from tagged n8n sub-workflows.
 
 ### Post-Phase-4 additions  ✅ DONE
@@ -239,7 +239,7 @@ that makes the assistant "adapt easily to any future n8n tool."
 - ✅ **Multi-model routing** (`docs/MODEL_ROUTING.md`): heuristic task classifier +
   per-category failover chains across Sadida/omarchy/Claude, health-gated hosts, and
   a dashboard model picker that doubles as the "which model answered" indicator.
-- ✅ **Telegram cerebro v3** (`n8n/cerebro_workflow_v3.json`): hybrid thrifty router —
+- ✅ **Telegram Brain workflow v3** (`n8n/cerebro_workflow_v3.json`): hybrid thrifty router —
   `/task` and `/note` are deterministic (zero AI), everything else goes to Rebeca;
   nodes continue on error and report a short error message.
 - ✅ **Linear depth**: projects, parent tasks + subtasks, `create_plan` (propose →
@@ -247,7 +247,7 @@ that makes the assistant "adapt easily to any future n8n tool."
 - ✅ **Homelab widget + `query_metrics`**: service health per host plus per-node
   CPU/RAM/disk/GPU/VRAM from Prometheus.
 - ✅ **Files (Nextcloud)**: WebDAV/OCS client, `/files/*` routes, dashboard widget
-  (browse, drag & drop, share link, delete) and the `Archivos` tools.
+  (browse, drag & drop, share link, delete) and the `Files` tools.
 - ✅ **Node access (SSH)**: dedicated `rebeca` user + key; dashboard hub terminal
   (xterm.js over a WebSocket PTY, with live per-node status lights) and the
   `run_on_node` tool (read-only direct, state-changing requires confirmation).

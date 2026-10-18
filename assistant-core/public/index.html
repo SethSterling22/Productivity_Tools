@@ -861,7 +861,7 @@ $("convosSearch").oninput = renderSessions;
 $("convosNew").onclick = () => { newChat(); closeAllDrawers(); };
 // ── Slash-command autocomplete (type "/" at the start of the message) ──
 let allTools = [], slashFlat = [], slashSel = 0;
-const SLASH_ORDER = ["Linear", "Calendario", "Notas / Brain", "Web", "Homelab", "Nodos", "Archivos", "Otros"];
+const SLASH_ORDER = ["Linear", "Calendar", "Notes / Brain", "Web", "Homelab", "Nodes", "Files", "Other"];
 function toolSigArgs(t) {
   const props = (t.input_schema && t.input_schema.properties) || {};
   const req = (t.input_schema && t.input_schema.required) || [];
@@ -876,7 +876,7 @@ function renderSlash(q) {
   if (!matches.length) { hideSlash(); return; }
   if (slashSel >= matches.length) slashSel = 0;
   const groups = {};
-  for (const t of matches) (groups[t.category || "Otros"] = groups[t.category || "Otros"] || []).push(t);
+  for (const t of matches) (groups[t.category || "Other"] = groups[t.category || "Other"] || []).push(t);
   const cats = Object.keys(groups).sort((a, b) => { const ia = SLASH_ORDER.indexOf(a), ib = SLASH_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
   slashFlat = []; let html = "";
   for (const c of cats) {
@@ -949,10 +949,10 @@ async function loadCaps() {
     const r = await (await fetch(API + "/tools")).json();
     const tools = r.tools || [];
     allTools = tools;
-    // Group by category (falls back to "Otros" when a tool has none).
+    // Group by category (falls back to "Other" when a tool has none).
     const groups = {};
-    for (const t of tools) (groups[t.category || "Otros"] = groups[t.category || "Otros"] || []).push(t);
-    const order = ["Linear", "Calendario", "Notas / Brain", "Web", "Homelab", "Otros"];
+    for (const t of tools) (groups[t.category || "Other"] = groups[t.category || "Other"] || []).push(t);
+    const order = ["Linear", "Calendar", "Notes / Brain", "Web", "Homelab", "Nodes", "Files", "Other"];
     const names = Object.keys(groups).sort((a, b) => {
       const ia = order.indexOf(a), ib = order.indexOf(b);
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);

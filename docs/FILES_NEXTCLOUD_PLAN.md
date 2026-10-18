@@ -81,7 +81,7 @@ A card (or a modal like the task manager) with: breadcrumb navigation, a file/fo
 list, **drag & drop upload zone**, and per-item actions (download, move, delete,
 share, "send to node…"). Talks only to `/files/*`.
 
-### Rebeca tools (manifest, category "Archivos")
+### Rebeca tools (manifest, category "Files")
 - `list_files(path)` · `upload_file` (from a URL or a note) · `move_file(src,dst)` ·
   `delete_file(path)` · `create_folder(path)` · `share_file(path)` ·
   `storage_usage()` · `distribute_file(path, node, dest?)` (Part 2).
@@ -150,7 +150,7 @@ target), a node registry (name → tailnet host → transport), and Rebeca picks
    `/files/storage`; widget browse + download. Validate WebDAV/app-password.
 2. **Write ops** — upload (drag & drop, chunked), mkdir, move, delete; widget actions.
 3. **Sharing** — `share_file` (OCS link) + widget "share".
-4. **Rebeca tools** — manifest `Archivos` category (list/upload/move/delete/share/storage).
+4. **Rebeca tools** — manifest `Files` category (list/upload/move/delete/share/storage).
 5. **Distribution** — pick A/B/C per node; node registry; `distribute_file` tool +
    widget "send to node…"; finish/harden SwapFile if we go with B.
 6. (Optional later) RAG over selected Nextcloud folders.

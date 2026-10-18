@@ -36,7 +36,7 @@ services:
     # must be published HERE, not on the n8n service.
     ports:
       - "5678:5678"
-      # assistant-core (Jarvis brain) — reachable on the tailnet at this port.
+      # assistant-core (Rebeca — the brain) — reachable on the tailnet at this port.
       # Use the 4000 range to stay clear of the homelab services (8000/9000).
       # 4001 is reserved for the Phase 1 dashboard.
       - "4000:4000"
@@ -145,7 +145,7 @@ services:
 
 
   # ############################ assistant-core ############################
-  # The conversational "Jarvis" brain: LLM tool-calling loop, memory, and a
+  # The conversational brain (Rebeca): LLM tool-calling loop, memory, and a
   # streaming chat API shared by the dashboard and Telegram. Shares the Tailscale
   # network so it reaches Hermes (localhost:8080), n8n webhooks (localhost:5678)
   # and Ollama (MagicDNS) exactly like the other services. Its port is published
