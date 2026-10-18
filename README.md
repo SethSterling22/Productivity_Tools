@@ -131,6 +131,12 @@ flowchart LR
   HERMES -->|"read/write + git push"| VAULT
   VAULT --> GH
   QD -. "indexes" .- VAULT
+
+  %% ── Homelab nodes ──
+  subgraph hl["Homelab nodes (SSH, user 'rebeca')"]
+    NODES["ocra · sadida · omarchy<br/>aery · sram · sacro · xelor"]
+  end
+  AC -->|"SSH exec / PTY (ssh2)"| NODES
 ```
 
 ---
@@ -140,10 +146,11 @@ flowchart LR
 | Component | Path | What it does |
 | --- | --- | --- |
 | **assistant-core (Rebeca)** | `assistant-core/` | Chat API + agent tool-calling loop, memory, voice proxy, auth gate; serves the dashboard and `/watch`. |
-| **Dashboard** | `assistant-core/public/index.html` | Web UI: streaming chat, push-to-talk voice, brain graph, calendar, sessions. Tailnet-only (Serve `:8443`). |
+| **Dashboard** | `assistant-core/public/index.html` | Web UI: streaming chat (markdown), push-to-talk voice, model picker, slash-command autocomplete, tasks, files, homelab status, brain graph, SSH terminal, ES/EN. Tailnet-only (Serve `:8443`). |
 | **Watch UI** | `assistant-core/public/watch.html` | Voice-first circular UI for the Galaxy Watch. Public Funnel `:10000` + watch token. |
-| **Tool manifest** | `assistant-core/tools.manifest.json` | Declares every capability; hot-reloaded. See `docs/ADDING_A_TOOL.md`. |
-| **n8n workflow** | `n8n/cerebro_workflow_v2.json` | Telegram entry point, slash-command Router, tool sub-workflows. |
+| **Tool manifest** | `assistant-core/tools.manifest.json` | Declares every capability (with `category`); hot-reloaded. See `docs/ADDING_A_TOOL.md`. |
+| **n8n cerebro (v3)** | `n8n/cerebro_workflow_v3.json` | Telegram entry point — hybrid thrifty router (see below). `cerebro_workflow_v2.json` is the legacy version. |
+| **n8n tool workflows** | `n8n/tools/` | Webhook sub-workflows: `assistant_tools` (task/event), `linear_tasks` (list/projects/update/complete/create_project), `linear_whoami`, `_template`. |
 | **Hermes gateway** | `hermes-agent/mcp-server/gateway.js` | HTTP server on `:8080`; brain/fs/shell tools via `POST /tool/:name`. |
 | **Hermes MCP server** | `hermes-agent/mcp-server/server.js` | Native stdio MCP server (same tools) for MCP-native clients. |
 | **Voice services** | `voice-services/` | Whisper (STT) + Piper (TTS) on GPU hosts (omarchy/sadida), with health-based failover. |
@@ -158,45 +165,61 @@ toggles (see `n8n/.env.example`).
 
 ---
 
-## Routing model
+## Routing model (thrifty by design)
 
-> Note: this decision path applies to **Telegram slash-commands**. Free-form
-> conversation (dashboard, watch, voice, non-command Telegram text) is delegated to
-> **assistant-core (Rebeca)**, which runs its own LLM tool-calling loop over the
-> tool manifest. Router and assistant-core call the same tools.
+Two layers of routing, both built to **use the cheapest thing that works** and keep
+the paid model as a last resort.
 
-Every incoming Telegram message flows through the same decision path:
+### 1. Telegram entry (cerebro v3 — hybrid)
 
-1. **Extract message** — normalize the Telegram payload (`raw_text`, `chat_id`).
-2. **Fast route** — short-circuits without spending the classifier:
-   - Slash commands go straight to an agent: `/claude`, `/task`, `/note`,
-     `/content`, `/progress`, `/qwen`, `/chat` (the command token is stripped).
-   - Prompts longer than **1500 characters** go straight to Claude.
-3. **Classifier (Qwen 1.7b)** — only runs when Fast route did not decide. It
-   returns an intent and also recognizes natural language ("quiero tomar nota de
-   esto" → NOTE, "agrega esto a mis tareas" → TASK).
-4. **Parse intent** — normalizes the decision. Casual chat (`CHAT` /
-   `SIMPLE_QUERY`) always stays on local Qwen; Claude is reserved for technical
-   queries and explicit routing.
-5. **Router (Switch)** — sends the message down one agent lane.
-6. **Merge response** — formats the reply with a footer showing the source and
-   the intent/confidence.
+```
+/task, /note                 → DETERMINISTIC, zero AI (dispatched straight to the tool)
+free text · voice notes      → Rebeca (assistant-core)
+/plan /calendar /brain /web  → Rebeca, mapped to natural language
+```
+
+Voice notes are transcribed (Whisper) and then follow the same path. All nodes
+continue on error and reply with a short error message instead of failing silently.
+
+### 2. Model router (inside assistant-core)
+
+A **heuristic classifier** (keywords + length — no inference spent on classifying)
+picks a per-turn failover chain across hosts:
+
+| Category | Chain |
+| --- | --- |
+| trivial (greetings) | `qwen3:1.7b` (sadida) → `qwen3.5:4b` → Claude |
+| general · tools · node commands | `qwen3.5:4b` (sadida) → Claude |
+| reasoning | `deepseek-r1:8b` (omarchy) → `deepseek-r1:1.5b` (sadida) → Claude |
+| coding | `qwen2.5-coder:7b` (omarchy) → `qwen2.5-coder:3b` (sadida) → Claude |
+| planning / compose-new | Claude → `qwen3.5:4b` |
+
+Ollama hosts are health-gated, so a powered-off node is skipped instantly. The
+dashboard's **model picker** shows which model answered and lets you force any
+discovered model (Claude stays optional). Details: [`docs/MODEL_ROUTING.md`](docs/MODEL_ROUTING.md).
 
 ---
 
-## Agents
+## Capabilities
 
-| Agent | Status | Backend | Notes |
-| --- | --- | --- | --- |
-| **Chat** | ✅ Live | Ollama / Qwen | Casual conversation, always local. |
-| **Claude** | ✅ Live | Claude API → Qwen fallback | High-quality / technical answers. |
-| **Note (second brain)** | ✅ Live | Hermes `note_save` → git (Obsidian vault) | Writes Markdown notes and commits/pushes them to GitHub so the vault syncs across devices. |
-| **Task** | ✅ Live | Linear (GraphQL) | Creates an issue from the message (first line = title). |
-| **Calendar** | ✅ Live | Google Calendar via n8n | Create events, list the day's/upcoming agenda (`create_event`, `list_today_events`). |
-| **Web search** | ✅ Live | SearXNG (self-hosted) | Current facts: weather, news, prices (`web_search` builtin). |
-| **Semantic brain (RAG)** | ✅ Live | Qdrant + Ollama embeddings | Answers grounded in your notes (`search_brain_semantic`). |
-| **Content** | 🚧 Planned | TBD | Draft/expand written content. |
-| **Progress** | 🚧 Planned | TBD | Log and report on progress/status. |
+Every capability is a descriptor in `tools.manifest.json`, grouped by `category`.
+
+| Category | Tools | Backend |
+| --- | --- | --- |
+| **Linear** | `create_task`, `create_plan`, `create_project`, `list_tasks`, `list_projects`, `update_task`, `complete_task` | Linear GraphQL via n8n (+ a `create_plan` builtin that composes parent + subtasks) |
+| **Calendario** | `create_event`, `list_today_events` | Google Calendar via n8n (OAuth2) |
+| **Notas / Brain** | `save_note`, `search_brain`, `search_brain_semantic` | Hermes → git vault; RAG via Qdrant + Ollama embeddings |
+| **Web** | `web_search` | Self-hosted SearXNG |
+| **Homelab** | `query_metrics` | Prometheus (PromQL) |
+| **Archivos** | `list_files`, `create_folder`, `move_file`, `delete_file`, `share_file`, `storage_usage` | Nextcloud (WebDAV + OCS) |
+| **Nodos** | `run_on_node` | SSH (ssh2) to homelab nodes as the dedicated `rebeca` user |
+
+Behavioral guardrails: **planning** proposes the plan and waits for approval before
+creating anything; **`run_on_node`** runs read-only commands directly but refuses
+state-changing ones unless the user explicitly confirmed the exact command.
+
+Planned: content drafting, progress logging, wake word, streaming TTS, file
+distribution to node `Shared/` folders (see [`docs/FILES_NEXTCLOUD_PLAN.md`](docs/FILES_NEXTCLOUD_PLAN.md)).
 
 ### Note agent — git-backed Obsidian vault
 
@@ -206,17 +229,19 @@ runs `git add/commit/push` so the vault stays in sync across every device via
 GitHub. Configure it with `HERMES_BRAIN_*` env vars (root path, remote, branch,
 optional SSH deploy key). See `LAUNCH.md`.
 
-### Calendar agent (live) — Google Calendar
+### Time zone
 
-Rebeca turns natural-language requests ("agéndame una llamada mañana a las 3",
-"¿qué tengo hoy?") into Google Calendar actions.
+America/Puerto_Rico (UTC-04:00). assistant-core injects the current date/time into
+the system prompt, so relative dates ("mañana", "el viernes") resolve correctly and
+calendar events get the right ISO 8601 offset.
 
-- **Backend:** Google Calendar via n8n's native **Google Calendar** node (OAuth2
-  credential stored in n8n, not in `.env`), exposed as the `create_event` and
-  `list_today_events` tool webhooks.
-- **Time zone:** America/Puerto_Rico (UTC-04:00); assistant-core injects the
-  current date/time into the system prompt so relative dates resolve correctly and
-  events are created with the right ISO 8601 offset.
+### Node access (SSH)
+
+A dedicated non-root user (**`rebeca`**, in the `docker` group) with a dedicated key,
+over the tailnet. Powers both the dashboard's **hub terminal** (xterm.js over a
+WebSocket PTY, with live up/down lights per node) and the **`run_on_node`** tool.
+Off by default — set `NODE_SSH_ENABLED=true` and mount the key. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
@@ -230,8 +255,17 @@ cp .env.example .env      # fill in secrets (never commit .env)
 sudo docker compose up -d --build
 ```
 
-Then import `n8n/cerebro_workflow_v2.json` into n8n, connect the Telegram
-credential, and activate the workflow.
+Then in n8n: import `cerebro_workflow_v3.json` (Telegram) and the workflows in
+`n8n/tools/`, attach the Telegram / Linear / Google credentials, and **activate**
+them.
+
+Redeploying after a code change:
+
+```bash
+git pull && sudo docker compose up -d --build --no-deps assistant-core
+```
+
+Manifest-only changes hot-reload (no rebuild).
 
 ---
 
@@ -249,7 +283,10 @@ infrastructure-specific values (search the repo for each):
 | NFS `storageClassName: nfs-client`, `ReadWriteMany` PVC | `hermes-stack.yaml` | Your cluster's storage class (k8s path only). |
 | `nodeSelector: kubernetes.io/hostname: ocra` | `hermes-stack.yaml` | Your target node (k8s path only). |
 | `HERMES_BRAIN_*` (brain repo, remote, key) | `.env.example` | Your Obsidian/GitHub vault repo. |
-| Linear `teamId` | `Build task` code node | Your Linear team id. |
+| Linear `teamId` / `assigneeId` | `Build task`, `Linear — create project` code nodes | Your Linear team + user ids (get the user id with `n8n/tools/linear_whoami.workflow.json`). |
+| Node names + hosts (`ocra`, `sadida`, …) | `assistant-core/src/ssh.js` (`DEFAULT_NODES`), `NODES` env | Your nodes and tailnet hostnames. |
+| Metric queries (node_exporter + `nvidia_smi_*`) | `assistant-core/src/metrics.js`, `METRICS_PANELS` env | Your exporters' metric names. |
+| `NEXTCLOUD_URL/USER/APP_PASSWORD` | `.env` | Your Nextcloud (use an app password). |
 
 Notes worth keeping in mind when porting:
 
@@ -269,14 +306,37 @@ Productivity_Tools/
 ├── README.md                 # this file
 ├── HANDOFF.md                # context brief for the automation agent
 ├── LAUNCH.md                 # step-by-step bring-up
-├── .gitignore
+├── assistant-core/           # Rebeca: the brain + dashboard + watch UI
+│   ├── src/                  # index, agent, llm, router, tools, memory, rag,
+│   │                         #   websearch, metrics, nextcloud, ssh, auth, config
+│   ├── public/               # index.html (dashboard), watch.html, favicon.svg
+│   ├── tools.manifest.json   # every capability (hot-reloaded)
+│   └── Dockerfile
 ├── n8n/
-│   ├── cerebro_workflow_v2.json
-│   ├── docker-compose.yaml
+│   ├── cerebro_workflow_v3.json   # Telegram → hybrid router (current)
+│   ├── cerebro_workflow_v2.json   # legacy
+│   ├── tools/                     # assistant_tools, linear_tasks, linear_whoami, _template
+│   ├── docker-compose.yaml        # the whole stack
 │   └── .env.example
+├── voice-services/           # whisper/ + piper/ (GPU hosts)
+├── searxng/settings.yml      # self-hosted web search
+├── docs/                     # ARCHITECTURE, JARVIS_ROADMAP, MODEL_ROUTING,
+│                             #   ADDING_A_TOOL, FILES_NEXTCLOUD_PLAN, STATE_OF_THE_ART_2026
 └── hermes-agent/
-    ├── README.md
     ├── mcp-server/           # gateway.js, server.js, Dockerfile, package.json
     ├── k8s/hermes-stack.yaml # optional Kubernetes deployment
     └── scripts/deploy.sh
 ```
+
+---
+
+## Documentation
+
+| Doc | What's in it |
+| --- | --- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Components, communication diagrams, network exposure, Google OAuth + token flows, tool dispatch, data stores. |
+| [`docs/JARVIS_ROADMAP.md`](docs/JARVIS_ROADMAP.md) | Phases, what's done, what's next. |
+| [`docs/MODEL_ROUTING.md`](docs/MODEL_ROUTING.md) | Task-specialized model routing, hosts, installed models, tuning. |
+| [`docs/ADDING_A_TOOL.md`](docs/ADDING_A_TOOL.md) | How to add a capability (n8n webhook / Hermes / builtin / http). |
+| [`docs/FILES_NEXTCLOUD_PLAN.md`](docs/FILES_NEXTCLOUD_PLAN.md) | Files integration + the node-distribution plan. |
+| [`docs/STATE_OF_THE_ART_2026.md`](docs/STATE_OF_THE_ART_2026.md) | Local-model landscape review (Sep 2026) and upgrade candidates. |

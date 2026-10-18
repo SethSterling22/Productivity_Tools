@@ -236,6 +236,24 @@ that makes the assistant "adapt easily to any future n8n tool."
 - ✅ **DB migration resilience**: assistant-core retries the startup migration with
   backoff so it self-heals after a cold boot (e.g. a power outage) without a manual
   restart.
+- ✅ **Multi-model routing** (`docs/MODEL_ROUTING.md`): heuristic task classifier +
+  per-category failover chains across Sadida/omarchy/Claude, health-gated hosts, and
+  a dashboard model picker that doubles as the "which model answered" indicator.
+- ✅ **Telegram cerebro v3** (`n8n/cerebro_workflow_v3.json`): hybrid thrifty router —
+  `/task` and `/note` are deterministic (zero AI), everything else goes to Rebeca;
+  nodes continue on error and report a short error message.
+- ✅ **Linear depth**: projects, parent tasks + subtasks, `create_plan` (propose →
+  approve → create), auto-assignment, and a dashboard task manager with inline edit.
+- ✅ **Homelab widget + `query_metrics`**: service health per host plus per-node
+  CPU/RAM/disk/GPU/VRAM from Prometheus.
+- ✅ **Files (Nextcloud)**: WebDAV/OCS client, `/files/*` routes, dashboard widget
+  (browse, drag & drop, share link, delete) and the `Archivos` tools.
+- ✅ **Node access (SSH)**: dedicated `rebeca` user + key; dashboard hub terminal
+  (xterm.js over a WebSocket PTY, with live per-node status lights) and the
+  `run_on_node` tool (read-only direct, state-changing requires confirmation).
+- ✅ **Dashboard UX**: markdown rendering, slash-command autocomplete with hover
+  help, command palette (Ctrl-K), ES/EN i18n, "thinking" indicator, mobile overflow
+  fixes and a scrollable watch reply.
 
 ---
 
