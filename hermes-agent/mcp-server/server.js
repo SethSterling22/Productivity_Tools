@@ -444,7 +444,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       const body = {
-        model:      "claude-sonnet-4-6",
+        model:      "claude-sonnet-5-5",
         max_tokens: args.max_tokens || 1024,
         messages:   [{ role: "user", content: args.prompt }],
       };

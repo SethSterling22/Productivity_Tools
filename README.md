@@ -84,7 +84,7 @@ flowchart LR
 
   %% ── LLMs ──
   subgraph llm["LLMs (task router, local-first)"]
-    CLAUDE["Claude API<br/>claude-sonnet-5"]
+    CLAUDE["Claude API<br/>claude-sonnet-5-5"]
     OLLS["Ollama · Sadida<br/>qwen3.5 · qwen3 · deepseek-r1 · qwen2.5-coder · nomic-embed"]
     OLLO["Ollama · omarchy<br/>deepseek-r1:8b · qwen2.5-coder:7b"]
   end

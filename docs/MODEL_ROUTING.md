@@ -130,8 +130,91 @@ Ask something in each category and check `docker logs assistant_core` /the SSE `
 event shows the expected host+model; power off omarchy and confirm reasoning/coding
 fall back to sadida's light models, then to Claude.
 
+---
+
+## Review — October 2026
+
+### The gap: omarchy has no tool-calling model
+
+Node commands, explicit `/tool` calls and the default agent loop all land in
+**`general`**, whose only local target is **`qwen3.5:4b` on Sadida (4B)**. omarchy
+(8 GB) only holds a *reasoning* and a *coding* model, so the strongest hardware is
+never used for the thing that fails most often: multi-step tool calling.
+
+That matches the observed symptom — the 4B model announcing an action instead of
+emitting the tool call, or giving up after one refusal.
+
+### What the numbers say (BFCL-v4 / TAU2-Bench)
+
+| Model | Fits | Tool-calling evidence |
+|---|---|---|
+| **Qwen3.5-9B** | omarchy (8 GB) | Reported **66.1 BFCL-V4 / 79.1 TAU2-Bench**; described as the strongest option that fits an 8 GB card |
+| **Qwen3.5-4B** (current) | Sadida (4 GB) | **79.9 TAU2-Bench**, <3 GB at 4-bit — already the right pick for the small tier |
+| **Gemma 4 E4B** | Sadida | Native function-call special tokens (structural advantage over prompt-based JSON) — worth A/B testing |
+| Qwen3-4B | Sadida | Held the top sub-7B spot through early 2026 |
+
+Conclusion: the small tier is already well chosen; **what's missing is a 9B
+tool-caller on omarchy**.
+
+### Recommended change
+
+```bash
+# on omarchy (8 GB) — the missing tool-calling tier
+ollama pull qwen3.5:9b        # ~6.6 GB
+```
+
+Then route `general` to it first, falling back to Sadida's 4B and finally Claude:
+
+```
+general: omarchy/qwen3.5:9b → sadida/qwen3.5:4b → claude
+```
+
+Set it without touching code via `MODEL_ROUTES`:
+
+```
+MODEL_ROUTES={"general":[{"host":"omarchy","model":"qwen3.5:9b"},{"host":"sadida","model":"qwen3.5:4b"},{"claude":true}]}
+```
+
+### Evaluated and rejected
+
+- **Ternary Bonsai-2** (PrismML, Sep 2026) — a 27B retaining ~98% of Qwen3.8-27B
+  in a fraction of the size, with tools/thinking/vision, which would be spectacular
+  for this hardware. **But it needs PrismML's own llama.cpp fork**: stock Ollama
+  cannot run it until the ternary kernels land upstream. Re-check later; not
+  actionable today.
+- **Nemotron 3.5 / Muse Spark / DeepSeek V4.1** — far beyond 8 GB.
+
+## Prompt-processing optimization (Ollama tuning)
+
+These cost nothing and directly attack the two problems we hit: VRAM pressure on
+4 GB and the cold-start timeout.
+
+Set on **each Ollama host** (systemd override or the service env):
+
+```bash
+OLLAMA_FLASH_ATTENTION=1      # cuts KV-cache VRAM ~30-50%
+OLLAMA_KV_CACHE_TYPE=q8_0     # halves KV memory again; quality impact negligible
+                              #   (needs flash attention enabled)
+OLLAMA_KEEP_ALIVE=30m         # keeps the model resident -> no 100s+ cold start
+OLLAMA_CONTEXT_LENGTH=8192    # KV is allocated up front for the FULL context;
+                              #   don't pay for 256K you never use
+```
+
+Notes:
+- On **Sadida (4 GB)** flash attention + `q8_0` is what buys the headroom to keep a
+  4B model fully on GPU instead of spilling to CPU.
+- `num_batch` (default 512) raises prompt-eval speed / time-to-first-token, but only
+  raise it once the model sits at 100% GPU — otherwise it makes things worse.
+- `OLLAMA_KEEP_ALIVE` is the direct fix for the Telegram timeout we saw: the first
+  request of the day was paying the model load.
+
 ## Sources
 - Small/fast models: <https://localaimaster.com/blog/small-language-models-guide-2026>, <https://benchlm.ai/best/ollama-models>
 - 8/12 GB reasoning + tool calling: <https://localaimaster.com/vram/best-llm-12gb-vram>, <https://modelfit.io/blog/best-ai-models-for-8gb-vram/>
 - Coding specialists: <https://localaimaster.com/models/best-local-ai-coding-models>, <https://www.morphllm.com/best-ollama-models>
 - DeepSeek-R1 distills vs Qwen: <https://www.promptquorum.com/power-local-llm/deepseek-vs-qwen-local-comparison-2026>, <https://ollama.com/library/deepseek-r1>
+
+### October 2026 review
+- Tool-calling benchmarks (BFCL-v4 / TAU2): <https://gorilla.cs.berkeley.edu/leaderboard.html>, <https://benchlm.ai/benchmarks/bfcl-v4>, <https://ai.rs/ai-developer/gemma-4-vs-qwen-3-5-vs-llama-4-compared>, <https://www.ertas.ai/blog/on-device-tool-calling-2026-qwen3-gemma4-phi4>, <https://vdf.ai/blog/best-local-llm-for-agents-tool-calling/>
+- Ternary Bonsai-2: <https://prismml.com/news/bonsai-2-27b>, <https://local-ai-zone.github.io/blog/bonsai-2-27b-ternary-quantization-deep-dive.html>
+- Ollama tuning: <https://docs.ollama.com/faq>, <https://modelpiper.com/blog/ollama-kv-cache-quantization>, <https://www.ssdnodes.com/learn/ollama-kv-cache-quantization>, <https://eastondev.com/blog/en/posts/ai/20260410-ollama-performance-optimization/>

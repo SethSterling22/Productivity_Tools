@@ -503,7 +503,7 @@ const TOOLS = {
       return ollamaChat({ prompt, model: CLAUDE_FALLBACK_MODEL, system, temperature });
     }
     const body = {
-      model:      "claude-sonnet-4-6",
+      model:      "claude-sonnet-5-5",
       max_tokens: max_tokens || 1024,
       messages:   [{ role: "user", content: prompt }],
     };

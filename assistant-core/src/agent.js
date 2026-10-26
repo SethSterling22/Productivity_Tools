@@ -153,6 +153,7 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
 
   const tools = llmTools(ch);
   let finalText = "";
+  let lastTool = null;   // remembered so the turn never ends silently
 
   // Model selection. A manual override (from the dashboard dropdown) forces one
   // model with no fallback (so you can test that exact model). Otherwise the
@@ -211,6 +212,7 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
       for (const tc of toolCalls) {
         emit({ type: "tool_call", name: tc.name, input: tc.input });
         const result = await dispatch(tc.name, tc.input);
+        lastTool = { name: tc.name, result };
         emit({ type: "tool_result", name: tc.name, result });
         await memory.append({ sessionId, role: "tool", toolName: tc.name, toolResult: result });
         resultBlocks.push({
@@ -223,33 +225,18 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
       continue; // loop so the model can use the tool results
     }
 
-    // Small local models often ANNOUNCE a tool call ("voy a ejecutar…") and then
-    // end the turn without emitting one. Nudge once instead of returning the
-    // announcement as if it were the answer.
-    if (!nudged && tools.length && text && ANNOUNCE_RE.test(text.trim())) {
+    // Small local models often ANNOUNCE a tool call ("voy a ejecutar…"), or return
+    // nothing at all, and end the turn without emitting one. Nudge once instead of
+    // treating that as the answer.
+    const empty = !String(text || "").trim();
+    if (!nudged && tools.length && (empty || ANNOUNCE_RE.test(text))) {
       nudged = true;
-      messages.push({ role: "assistant", content: text });
+      if (text) messages.push({ role: "assistant", content: text });
       messages.push({
         role: "user",
-        content:
-          "You announced an action but did not call any tool. Call the appropriate " +
-          "tool NOW with the exact arguments, then answer with the result. Do not " +
-          "describe what you are going to do.",
-      });
-      continue;
-    }
-
-    // Small models sometimes ANNOUNCE an action ("voy a ejecutar…") and end the
-    // turn without emitting a tool call. Nudge once instead of returning that.
-    if (!nudged && tools.length && ANNOUNCE_RE.test(text || "")) {
-      nudged = true;
-      messages.push({ role: "assistant", content: text || "" });
-      messages.push({
-        role: "user",
-        content:
-          "Dijiste que ibas a ejecutarlo pero no llamaste a ninguna herramienta. " +
-          "Llama ahora a la herramienta correspondiente con los argumentos concretos. " +
-          "No describas el comando: ejecútalo.",
+        content: empty
+          ? "Ya tienes el resultado de las herramientas. Responde AHORA con la conclusión en texto, citando los datos obtenidos. No llames más herramientas."
+          : "Dijiste que ibas a ejecutarlo pero no llamaste a ninguna herramienta. Llama ahora a la herramienta correspondiente con los argumentos concretos. No describas el comando: ejecútalo.",
       });
       continue;
     }
@@ -260,6 +247,17 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
     await memory.append({ sessionId, role: "assistant", content: finalText });
     emit({ type: "text", text: finalText });
     break;
+  }
+
+  // Never end the turn silently: if the model produced no prose (ran out of steps,
+  // or kept calling tools), surface the last tool result so the work isn't lost.
+  if (!String(finalText || "").trim()) {
+    finalText = lastTool
+      ? `_(el modelo no redactó una conclusión; este es el último resultado)_\n\n` +
+        formatToolResult(lastTool.name, lastTool.result)
+      : "⚠ El modelo no devolvió respuesta. Reintenta, o elige otro modelo en el selector.";
+    await memory.append({ sessionId, role: "assistant", content: finalText });
+    emit({ type: "text", text: finalText });
   }
 
   emit({ type: "done", text: finalText });
