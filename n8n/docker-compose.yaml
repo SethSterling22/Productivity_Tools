@@ -199,6 +199,9 @@ services:
       # exist on the nodes. NODES = JSON map name->host (tailnet).
       - NODE_SSH_ENABLED=${NODE_SSH_ENABLED:-false}
       - NODE_SSH_USER=${NODE_SSH_USER:-rebeca}
+      # guarded (default): read runs free, write needs confirmation.
+      # open: write also runs unattended; DANGER still always asks.
+      - NODE_SSH_MODE=${NODE_SSH_MODE:-guarded}
       - NODE_SSH_KEY=/app/.ssh/nodes_key
       - NODES=${NODES:-}
       # Dashboard login (Google OAuth). Empty CLIENT_ID = auth disabled (open).

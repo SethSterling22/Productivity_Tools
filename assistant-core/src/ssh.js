@@ -56,24 +56,162 @@ function hostFor(name) {
   return h;
 }
 
-// A command is "read-only" if its first token is in this allowlist. Anything else
-// is treated as mutating and needs confirmation.
-const RO = [
-  "docker ps", "docker images", "docker logs", "docker inspect", "docker stats",
-  "docker version", "docker info", "docker compose ls", "docker compose ps",
-  "ls", "ll", "cat", "head", "tail", "grep", "find", "stat", "wc",
-  "df", "du", "free", "uptime", "whoami", "pwd", "date", "uname", "hostname",
-  "systemctl status", "journalctl", "ip a", "ip addr", "ping", "nvidia-smi",
-  "top", "htop", "ps", "ss", "netstat", "echo", "env", "which",
+// ── Read-only classification ────────────────────────────────────────────────
+// A command is "read-only" when it only inspects the node. Anything else needs
+// explicit confirmation. Rather than a flat prefix list (which kept missing
+// things like `docker network ls`), binaries with subcommands are classified by
+// their verb.
+
+// Plain binaries that never change state: system, files, network, security.
+const RO_BIN = new Set([
+  // files & text
+  "ls", "ll", "cat", "bat", "head", "tail", "grep", "egrep", "zgrep", "rg", "find", "fd",
+  "stat", "wc", "file", "readlink", "realpath", "basename", "dirname", "sort", "uniq",
+  "cut", "awk", "sed", "tree", "diff", "cmp", "md5sum", "sha256sum", "strings", "xxd",
+  // system
+  "df", "du", "free", "uptime", "whoami", "id", "groups", "pwd", "date", "uname",
+  "hostname", "journalctl", "dmesg", "top", "htop", "ps", "pidof", "pgrep", "lsof",
+  "env", "printenv", "which", "whereis", "type", "lsblk", "lscpu", "lsmod", "lspci",
+  "lsusb", "mount", "blkid", "nproc", "vmstat", "iostat", "sensors", "uptime",
+  "nvidia-smi", "rocm-smi", "echo", "printf", "last", "lastlog", "who", "w", "getent",
+  "crontab -l", "timedatectl", "localectl", "hostnamectl",
+  // network
+  "ping", "ping6", "traceroute", "tracepath", "mtr", "dig", "host", "nslookup",
+  "whois", "arp", "ss", "netstat", "ifconfig", "iwconfig", "ethtool", "nmcli",
+  "tailscale", "wg", "route", "curl", "wget", "nc", "telnet", "openssl", "nmap",
+  "tcpdump", "arping", "speedtest", "iperf3",
+  // security / audit (read paths)
+  "aa-status", "sestatus", "getcap", "getfacl", "ssh-keyscan", "ssh-keygen",
+  "gpg", "certbot", "fail2ban-client", "lynis", "rkhunter", "chkrootkit", "clamscan",
+  "auditctl", "ausearch", "aureport", "sudo",
+]);
+// Binaries above that are read-only ONLY for certain first args.
+const RO_BIN_ARGS = {
+  sudo: new Set(["-l", "-n", "-V", "--list", "--version"]),
+  crontab: new Set(["-l"]),
+  tailscale: new Set(["status", "ip", "ping", "netcheck", "version", "whois", "dns", "lock", "debug", "serve", "funnel", "metrics"]),
+  wg: new Set(["show"]),
+  nmcli: new Set(["device", "connection", "general", "networking", "radio", "monitor", "d", "c", "g"]),
+  auditctl: new Set(["-l", "-s"]),
+  "fail2ban-client": new Set(["status", "get", "ping", "version"]),
+  certbot: new Set(["certificates", "--version", "show_account"]),
+  "ssh-keygen": new Set(["-l", "-F", "-y"]),
+  gpg: new Set(["--list-keys", "--list-secret-keys", "--fingerprint", "--verify", "--version"]),
+};
+
+// docker: read-only top-level verbs…
+const RO_DOCKER = new Set([
+  "ps", "images", "logs", "inspect", "stats", "version", "info", "port", "top",
+  "diff", "history", "events", "search",
+]);
+// …and object groups whose read-only verbs live one level deeper.
+const RO_DOCKER_GROUP = new Set([
+  "network", "volume", "image", "container", "system", "node", "service",
+  "context", "config", "compose", "secret", "plugin", "buildx",
+]);
+const RO_SUBVERB = new Set([
+  "ls", "list", "inspect", "df", "ps", "logs", "config", "version", "history",
+  "top", "port", "show", "stats", "events",
+]);
+
+// Other tools with subcommands.
+const RO_SYSTEMCTL = new Set(["status", "show", "list-units", "list-unit-files", "list-timers", "list-sockets", "is-active", "is-enabled", "is-failed", "cat"]);
+const RO_KUBECTL = new Set(["get", "describe", "logs", "top", "explain", "api-resources", "api-versions", "version", "config", "cluster-info", "events", "auth"]);
+const RO_IP = new Set(["a", "addr", "link", "route", "neigh", "rule", "maddr", "-4", "-6", "-br", "-s", "-c"]);
+const RO_GIT = new Set(["status", "log", "diff", "show", "branch", "remote", "rev-parse", "describe", "config", "blame", "shortlog", "ls-files", "tag"]);
+// LXC / LXD / Proxmox containers & VMs
+const RO_LXC = new Set(["list", "info", "config", "image", "network", "storage", "profile", "version", "cluster", "monitor", "query"]);
+const RO_PCT = new Set(["list", "status", "config", "df", "listsnapshot", "cpusets"]);      // Proxmox LXC
+const RO_QM = new Set(["list", "status", "config", "showcmd", "listsnapshot", "monitor"]);  // Proxmox VMs
+const RO_PVE = new Set(["status", "get", "ls", "report", "list"]);                          // pvesh/pvesm/pvecm
+// Firewalls: listing rules is read-only, changing them is not. Flags are
+// case-sensitive, so inspect the raw command instead of the lowercased token.
+function iptablesIsRead(raw) {
+  if (/(^|\s)-(A|I|D|R|P|N|X|F|Z|E)(\s|$)/.test(raw)) return false; // mutating flags
+  return /(^|\s)(-L|-S|--list|--list-rules)(\s|$)/.test(raw);
+}
+const RO_UFW = new Set(["status", "show", "version"]);
+
+// Commands that are destructive or disruptive enough that they ALWAYS require
+// confirmation, even if "open" mode is enabled. These are not blocked — the user
+// can still approve them — but they must never run unattended.
+const DANGER_RE = [
+  /\brm\s+(-[a-z]*\s+)*-[a-z]*[rf]/i,          // rm -rf …
+  /\bmkfs(\.|\s)/i, /\bfdisk\b/i, /\bparted\b/i, /\bwipefs\b/i,
+  /\bdd\b[^|]*\bof=\/dev\//i,                   // dd onto a device
+  /\b(shutdown|reboot|poweroff|halt|init\s+0|init\s+6)\b/i,
+  /\bsystemctl\s+(stop|disable|mask)\b/i,
+  /^(sudo\s+)?(userdel|groupdel|passwd|chpasswd|usermod)\b/i,   // account changes
+  /\biptables\s+(-F|--flush|-X)\b/i, /\bufw\s+(disable|reset)\b/i,
+  /\bdocker\s+(system\s+prune|volume\s+rm|rm\s+-f)\b/i,
+  /\b(pct|qm)\s+(destroy|stop)\b/i, /\blxc\s+delete\b/i,
+  /\bkubectl\s+delete\b/i,
+  /\bchmod\s+(-R\s+)?777\b/i, /\bchown\s+-R\s+\//i,
+  /:\(\)\s*\{.*\}\s*;?\s*:/,                    // fork bomb
+  /\bcurl\b[^|]*\|\s*(ba)?sh\b/i, /\bwget\b[^|]*\|\s*(ba)?sh\b/i, // pipe-to-shell
 ];
+export function isDangerous(command) {
+  const c = String(command || "");
+  return DANGER_RE.some((re) => re.test(c));
+}
+
 export function isReadOnly(command) {
-  const c = String(command || "").trim().toLowerCase();
-  // reject obvious chaining that could hide a mutation after a read-only prefix
-  if (/[;&|`$><]/.test(c) && !/\|\s*(grep|head|tail|wc|less|cat)\b/.test(c)) {
-    // allow simple safe pipes to pagers/filters; otherwise treat as mutating
-    if (/[;&`$>]|\|\|/.test(c)) return false;
+  const c = String(command || "").trim();
+  if (!c) return false;
+
+  // Reject chaining/redirection/substitution that could hide a mutation behind a
+  // read-only prefix. Simple pipes into filters/pagers are allowed.
+  if (/[;&`$><]/.test(c) || /\|\|/.test(c)) return false;
+  const segments = c.split("|").map((s) => s.trim()).filter(Boolean);
+  const FILTERS = new Set(["grep", "egrep", "head", "tail", "wc", "less", "cat", "sort", "uniq", "cut", "awk", "sed", "tr", "jq", "column", "xargs"]);
+  // Every stage after the first must be a harmless filter.
+  for (const seg of segments.slice(1)) {
+    if (!FILTERS.has(seg.split(/\s+/)[0].toLowerCase())) return false;
   }
-  return RO.some((p) => c === p || c.startsWith(p + " "));
+
+  const t = segments[0].split(/\s+/);
+  const bin = t[0].toLowerCase();
+  const a1 = (t[1] || "").toLowerCase();
+  const a2 = (t[2] || "").toLowerCase();
+
+  // Binaries that are read-only only for some first args (sudo -l, wg show, …).
+  if (RO_BIN_ARGS[bin]) {
+    if (!RO_BIN_ARGS[bin].has(a1)) return false;
+    // `sudo -l` is fine; `sudo <anything else>` is classified by the inner command.
+    return true;
+  }
+  if (RO_BIN.has(bin)) return true;
+  if (bin === "docker" || bin === "podman" || bin === "nerdctl") {
+    if (RO_DOCKER.has(a1)) return true;
+    if (RO_DOCKER_GROUP.has(a1)) return RO_SUBVERB.has(a2);
+    return false;
+  }
+  if (bin === "systemctl") return RO_SYSTEMCTL.has(a1);
+  if (bin === "kubectl" || bin === "k3s") return RO_KUBECTL.has(a1) || (a1 === "kubectl" && RO_KUBECTL.has(a2));
+  if (bin === "ip") return RO_IP.has(a1);
+  if (bin === "git") return RO_GIT.has(a1);
+  if (bin === "lxc" || bin === "incus") return RO_LXC.has(a1) && (a1 === "list" || a1 === "info" || a1 === "version" || RO_SUBVERB.has(a2) || a2 === "show" || a2 === "get");
+  if (bin === "pct") return RO_PCT.has(a1);
+  if (bin === "qm") return RO_QM.has(a1);
+  if (bin === "pvesh" || bin === "pvesm" || bin === "pvecm" || bin === "pveversion") return !a1 || RO_PVE.has(a1);
+  if (bin === "iptables" || bin === "ip6tables") return iptablesIsRead(segments[0]);
+  if (bin === "nft") return a1 === "list";
+  if (bin === "ufw") return RO_UFW.has(a1);
+  if (bin === "zfs" || bin === "zpool") return a1 === "list" || a1 === "status" || a1 === "get";
+  return false;
+}
+
+// Three-tier classification used by run_on_node.
+//   read   -> runs immediately
+//   write  -> needs confirm:true (or NODE_SSH_MODE=open)
+//   danger -> always needs confirm:true, and the model must warn the user
+export function classifyCommand(command) {
+  if (isDangerous(command)) return "danger";
+  return isReadOnly(command) ? "read" : "write";
+}
+// "open" lets ordinary write commands run unattended; danger still needs a yes.
+export function openMode() {
+  return String(process.env.NODE_SSH_MODE || "guarded").toLowerCase() === "open";
 }
 
 // One-shot command execution. Returns { ok, node, command, stdout, stderr, code }.

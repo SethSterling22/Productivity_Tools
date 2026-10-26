@@ -36,16 +36,26 @@ async function runOnNode(input) {
   const node = input.node, command = input.command, confirm = input.confirm === true;
   if (!node || !command) return { ok: false, error: "node and command are required" };
   if (!sshmod.nodeNames().includes(node)) return { ok: false, error: `Unknown node '${node}'. Known: ${sshmod.nodeNames().join(", ")}` };
-  if (!sshmod.isReadOnly(command) && !confirm) {
+
+  const level = sshmod.classifyCommand(command);   // read | write | danger
+  // read  -> always runs. write -> runs free in "open" mode, else needs confirm.
+  // danger-> always needs an explicit confirm, whatever the mode.
+  const needsOk = level === "danger" || (level === "write" && !sshmod.openMode());
+  if (needsOk && !confirm) {
     return {
       ok: false,
       needs_confirmation: true,
+      level,
       node,
       command,
-      message: "This command changes the node. Show the user the exact command and ask them to confirm; then call run_on_node again with confirm:true.",
+      message:
+        level === "danger"
+          ? "DESTRUCTIVE command. Show the user the exact command, explain clearly what it will destroy/interrupt, and only call run_on_node again with confirm:true after they explicitly approve."
+          : "This command changes the node. Show the user the exact command and ask them to confirm; then call run_on_node again with confirm:true.",
     };
   }
-  return sshmod.execOnNode(node, command);
+  const res = await sshmod.execOnNode(node, command);
+  return { ...res, level };
 }
 
 // Planning: create a parent task plus its subtasks in one step, reusing the
