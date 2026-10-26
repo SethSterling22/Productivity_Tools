@@ -148,6 +148,20 @@ function brainGit(args) {
   ], { timeout: 30000, maxBuffer: 1024 * 1024, env });
 }
 
+// Push the brain repo. If the remote moved ahead (notes edited from Obsidian or
+// uploaded on GitHub), rebase on top of it and retry once — otherwise every later
+// note push would keep failing with "fetch first".
+async function brainPush() {
+  try {
+    await brainGit(["push", BRAIN_GIT_REMOTE, BRAIN_GIT_BRANCH]);
+    return "pushed";
+  } catch (first) {
+    await brainGit(["pull", "--rebase", BRAIN_GIT_REMOTE, BRAIN_GIT_BRANCH]);
+    await brainGit(["push", BRAIN_GIT_REMOTE, BRAIN_GIT_BRANCH]);
+    return "pushed (after rebase)";
+  }
+}
+
 // ── Tool implementations ──────────────────────────────────────────────────────
 
 const TOOLS = {
@@ -261,8 +275,8 @@ const TOOLS = {
       try {
         await brainGit(["add", "--", outPath]);
         await brainGit(["commit", "-m", `note: ${noteTitle}`]);
-        await brainGit(["push", BRAIN_GIT_REMOTE, BRAIN_GIT_BRANCH]);
-        synced = `pushed to ${BRAIN_GIT_REMOTE}/${BRAIN_GIT_BRANCH}`;
+        const how = await brainPush();
+        synced = `${how} to ${BRAIN_GIT_REMOTE}/${BRAIN_GIT_BRANCH}`;
       } catch (err) {
         // The note is safely on disk even if the push fails.
         synced = `saved locally, git sync failed: ${err.message}`;
@@ -327,8 +341,8 @@ const TOOLS = {
       try {
         await brainGit(["add", "--", outPath]);
         await brainGit(["commit", "-m", `quick note: ${line.slice(0, 60)}`]);
-        await brainGit(["push", BRAIN_GIT_REMOTE, BRAIN_GIT_BRANCH]);
-        synced = `pushed to ${BRAIN_GIT_REMOTE}/${BRAIN_GIT_BRANCH}`;
+        const how = await brainPush();
+        synced = `${how} to ${BRAIN_GIT_REMOTE}/${BRAIN_GIT_BRANCH}`;
       } catch (err) {
         synced = `saved locally, git sync failed: ${err.message}`;
       }
