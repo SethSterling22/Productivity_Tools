@@ -148,26 +148,54 @@ const DANGER_RE = [
   /\bkubectl\s+delete\b/i,
   /\bchmod\s+(-R\s+)?777\b/i, /\bchown\s+-R\s+\//i,
   /:\(\)\s*\{.*\}\s*;?\s*:/,                    // fork bomb
-  /\bcurl\b[^|]*\|\s*(ba)?sh\b/i, /\bwget\b[^|]*\|\s*(ba)?sh\b/i, // pipe-to-shell
+  /\|\s*(sudo\s+)?(ba|z|k|da)?sh\b/i,            // piping anything into a shell
 ];
 export function isDangerous(command) {
   const c = String(command || "");
   return DANGER_RE.some((re) => re.test(c));
 }
 
+// Split a command line on &&, ||, |, ; and & — ignoring separators inside quotes,
+// so `--format '{{range .X}}|{{end}}'` is not mistaken for a pipe.
+function splitSegments(cmd) {
+  const out = [];
+  let cur = "", q = null;
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (q) { cur += ch; if (ch === q) q = null; continue; }
+    if (ch === "'" || ch === '"') { q = ch; cur += ch; continue; }
+    if ((ch === "&" && cmd[i + 1] === "&") || (ch === "|" && cmd[i + 1] === "|")) { out.push(cur); cur = ""; i++; continue; }
+    if (ch === "|" || ch === ";" || ch === "&") { out.push(cur); cur = ""; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.map((s) => s.trim()).filter(Boolean);
+}
+
+// True when the character appears outside quotes (redirection, substitution…).
+function hasUnquoted(cmd, chars) {
+  let q = null;
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (q) { if (ch === q) q = null; continue; }
+    if (ch === "'" || ch === '"') { q = ch; continue; }
+    if (chars.includes(ch)) return true;
+    if (ch === "$" && cmd[i + 1] === "(") return true;
+  }
+  return false;
+}
+
 export function isReadOnly(command) {
   const c = String(command || "").trim();
   if (!c) return false;
 
-  // Reject chaining/redirection/substitution that could hide a mutation behind a
-  // read-only prefix. Simple pipes into filters/pagers are allowed.
-  if (/[;&`$><]/.test(c) || /\|\|/.test(c)) return false;
-  const segments = c.split("|").map((s) => s.trim()).filter(Boolean);
-  const FILTERS = new Set(["grep", "egrep", "head", "tail", "wc", "less", "cat", "sort", "uniq", "cut", "awk", "sed", "tr", "jq", "column", "xargs"]);
-  // Every stage after the first must be a harmless filter.
-  for (const seg of segments.slice(1)) {
-    if (!FILTERS.has(seg.split(/\s+/)[0].toLowerCase())) return false;
-  }
+  // Writing to a file or substituting a command is never plain reading.
+  if (hasUnquoted(c, "><`")) return false;
+
+  // A chain is read-only only if EVERY segment is. This is what allows
+  // `docker inspect X --format '…' && docker network ls | grep -v CONTAINER`.
+  const segments = splitSegments(c);
+  if (segments.length > 1) return segments.every((s) => isReadOnly(s));
 
   const t = segments[0].split(/\s+/);
   const bin = t[0].toLowerCase();

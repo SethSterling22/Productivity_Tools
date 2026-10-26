@@ -657,9 +657,12 @@ async function send(opts) {
           clearTyping(); // first real event → stop showing the typing dots
           if (event === "tool_call") addTool(data.name, "→ llamando");
           else if (event === "tool_result") {
-            const bad = data.result && data.result.ok === false;
-            addTool(data.name, bad ? "⚠ falló" : "✓ resultado de");
-            if (bad && data.result.error) addMsg("assistant", "⚠ " + data.name + ": " + String(data.result.error).slice(0, 300));
+            const res = data.result || {};
+            const bad = res.ok === false;
+            const needsOk = bad && res.needs_confirmation;
+            addTool(data.name, needsOk ? "⏸ requiere confirmación" : bad ? "⚠ falló" : "✓ resultado de");
+            if (needsOk) addMsg("assistant", "⏸ **" + (res.level === "danger" ? "Comando destructivo" : "Cambia el nodo") + "** — requiere tu confirmación:\n```\n" + (res.command || "") + "\n```");
+            else if (bad && res.error) addMsg("assistant", "⚠ " + data.name + ": " + String(res.error).slice(0, 300));
           }
           else if (event === "route") lastRoute = data.category;
           else if (event === "model") onModelUsed(data);
