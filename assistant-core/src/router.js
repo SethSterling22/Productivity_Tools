@@ -15,16 +15,22 @@ const claude = () => ({ provider: "anthropic" });
 
 // category -> ordered failover chain. Editable via MODEL_ROUTES (JSON) env.
 const DEFAULT_ROUTES = {
+  // Measured on this hardware (Oct 2026): Sadida's RTX 3050 has ~3.8 GB usable, so
+  // only models <= ~2.5 GB stay 100% on GPU; omarchy's 3060 Ti fits ~6 GB once the
+  // desktop and voice services are accounted for. Anything bigger silently spills
+  // to CPU. Keep these lineups within those limits.
+  //
   // pure greetings / acknowledgements: cheapest, always-on
-  trivial: [o("sadida", "qwen3:1.7b"), o("sadida", "qwen3.5:4b"), claude()],
-  // default conversation (may call productivity tools): tool-capable small model
-  general: [o("sadida", "qwen3.5:4b"), claude()],
+  trivial: [o("sadida", "qwen3:1.7b"), claude()],
+  // default conversation + tool calling + node commands: the strong tier first,
+  // with an always-on small fallback so Sadida alone can still call tools.
+  general: [o("omarchy", "qwen3:8b"), o("sadida", "qwen3:1.7b"), claude()],
   // math / logic / analysis: reasoning ("thinking") models
   reasoning: [o("omarchy", "deepseek-r1:8b"), o("sadida", "deepseek-r1:1.5b"), claude()],
   // code / technical: coding specialists
   coding: [o("omarchy", "qwen2.5-coder:7b"), o("sadida", "qwen2.5-coder:3b"), claude()],
   // long / ambiguous / high-stakes: Claude first, local as a safety net
-  complex: [claude(), o("sadida", "qwen3.5:4b")],
+  complex: [claude(), o("omarchy", "qwen3:8b")],
 };
 
 function loadRoutes() {
@@ -63,7 +69,7 @@ export function classify(message) {
   const len = m.length;
   // Planning composes new structure -> Claude (the "invent it" case).
   if (PLAN_RE.test(m)) return "complex";
-  // Explicit tool calls and node commands -> the LOCAL tool model (qwen3.5:4b),
+  // Explicit tool calls and node commands -> the LOCAL tool model (qwen3:8b/1.7b),
   // NOT the coder. Claude is only the automatic fallback if the local model fails,
   // or if you force it from the model dropdown. Keeps Claude optional.
   if (m.startsWith("/")) return "general";

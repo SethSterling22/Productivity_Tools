@@ -6,7 +6,7 @@ Step-by-step to bring up the AI stack (n8n + Hermes gateway + local Ollama).
 
 - **Sadida** — Proxmox host. Runs the k3s control-plane and **Ollama locally**
   (only node with a discrete GPU, RTX 3050). Models: `qwen3:1.7b` (intent
-  classifier) and `qwen3.5:4b` (main agent).
+  classifier) and `qwen3:1.7b` (main agent).
 - **Ocra** — always-on "brain". Runs the Docker Compose stack:
   `postgres` + `tailscale` sidecar + `n8n` + `hermes-gateway`.
 - **Hermes** — custom HTTP gateway (`:8080`) exposing tools (filesystem, shell,
@@ -23,7 +23,7 @@ Step-by-step to bring up the AI stack (n8n + Hermes gateway + local Ollama).
 ```bash
 ssh seth@sadida
 ollama pull qwen3:1.7b      # intent classifier
-ollama pull qwen3.5:4b      # main agent
+ollama pull qwen3:1.7b      # main agent
 curl http://localhost:11434/api/tags   # verify both respond
 ```
 
@@ -63,7 +63,7 @@ sudo docker exec hermes_gateway wget -qO- localhost:8080/health
 sudo docker exec hermes_gateway wget -qO- localhost:8080/tools
 ```
 
-Expected in `/health`: `claude_fallback: "ollama:qwen3.5:4b"` (while
+Expected in `/health`: `claude_fallback: "ollama:qwen3:1.7b"` (while
 `ANTHROPIC_API_KEY` is empty).
 
 ## 5. Test the Qwen fallback end-to-end
@@ -98,7 +98,7 @@ to `true` in `.env`, then reload with `sudo docker compose up -d`.
 | Read/write/delete outside `/workspace` | `HERMES_FS_UNRESTRICTED` | `false` |
 | `fs_write` to any path | `HERMES_FS_ALLOW_WRITE_ANYWHERE` | `false` |
 | Enable the `fs_delete` tool | `HERMES_FS_ALLOW_DELETE` | `false` |
-| Local model used when Claude is unavailable | `HERMES_CLAUDE_FALLBACK_MODEL` | `qwen3.5:4b` |
+| Local model used when Claude is unavailable | `HERMES_CLAUDE_FALLBACK_MODEL` | `qwen3:1.7b` |
 
 ### Enabling SSH
 

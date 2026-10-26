@@ -117,7 +117,7 @@ services:
       - HERMES_FS_UNRESTRICTED=${HERMES_FS_UNRESTRICTED:-false}                    # read/write/delete anywhere
       - HERMES_FS_ALLOW_WRITE_ANYWHERE=${HERMES_FS_ALLOW_WRITE_ANYWHERE:-false}
       - HERMES_FS_ALLOW_DELETE=${HERMES_FS_ALLOW_DELETE:-false}
-      - HERMES_CLAUDE_FALLBACK_MODEL=${HERMES_CLAUDE_FALLBACK_MODEL:-qwen3.5:4b}
+      - HERMES_CLAUDE_FALLBACK_MODEL=${HERMES_CLAUDE_FALLBACK_MODEL:-qwen3:1.7b}
       # ── Second brain (git-backed Obsidian vault) ──────────────────────────────
       # Path to the SSH deploy key used by note_save to push to GitHub. The key
       # lives INSIDE the hermes_workspace volume (see setup notes), so no host
@@ -165,7 +165,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ASSISTANT_MODEL=${ASSISTANT_MODEL:-claude-sonnet-5-5}
       - OLLAMA_URL=http://sadida.stegosaurus-panga.ts.net:11434
-      - ASSISTANT_FALLBACK_MODEL=${ASSISTANT_FALLBACK_MODEL:-qwen3.5:4b}
+      - ASSISTANT_FALLBACK_MODEL=${ASSISTANT_FALLBACK_MODEL:-qwen3:1.7b}
       # Multi-model routing across Ollama hosts (sadida = light/always-on,
       # omarchy = strong/when-on). Claude is the last-resort target.
       - OLLAMA_SADIDA_URL=${OLLAMA_SADIDA_URL:-http://sadida.stegosaurus-panga.ts.net:11434}

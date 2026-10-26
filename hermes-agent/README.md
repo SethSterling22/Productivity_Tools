@@ -18,7 +18,7 @@ or the **Claude API** depending on the intent of the request.
 │  │  Ollama LOCAL (host)    │◄───────┤   • n8n (Telegram workflow)    │ │
 │  │   RTX 3050 · :11434     │ Ollama │   • hermes-gateway (:8080)     │ │
 │  │   qwen3:1.7b            │  API   │   • postgres                   │ │
-│  │   qwen3.5:4b            │        │   • tailscale (sidecar)        │ │
+│  │   qwen3:1.7b            │        │   • tailscale (sidecar)        │ │
 │  └────────────────────────┘        └───────────────┬────────────────┘ │
 │                                                     │ API calls        │
 └─────────────────────────────────────────────────────┼──────────────────┘
@@ -115,7 +115,7 @@ the netns of the Tailscale sidecar, the URL is `http://localhost:8080`:
 
 ```
 POST http://localhost:8080/tool/ollama_chat
-{ "prompt": "{{ $json.raw_text }}", "model": "qwen3.5:4b", "system": "..." }
+{ "prompt": "{{ $json.raw_text }}", "model": "qwen3:1.7b", "system": "..." }
 
 POST http://localhost:8080/tool/claude_chat
 { "prompt": "{{ $json.raw_text }}", "system": "..." }

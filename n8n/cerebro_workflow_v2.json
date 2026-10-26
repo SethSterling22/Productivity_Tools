@@ -367,7 +367,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"qwen3.5:4b\",\n  \"temperature\": 0.7,\n  \"system\": \"You are Sebastian's personal assistant. Detected intent: {{ $('Parse intent').first().json.intent }}. Be direct and concise. Respond in the user's language.\",\n  \"prompt\": \"={{ $('Parse intent').first().json.raw_text }}\"\n}"
+        "jsonBody": "={\n  \"model\": \"qwen3:1.7b\",\n  \"temperature\": 0.7,\n  \"system\": \"You are Sebastian's personal assistant. Detected intent: {{ $('Parse intent').first().json.intent }}. Be direct and concise. Respond in the user's language.\",\n  \"prompt\": \"={{ $('Parse intent').first().json.raw_text }}\"\n}"
       },
       "id": "hermes-ollama-chat",
       "name": "Hermes → Ollama (chat/simple)",

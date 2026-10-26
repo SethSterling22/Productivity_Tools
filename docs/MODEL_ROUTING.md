@@ -20,8 +20,8 @@ always-on Sadida and the heavy specialists on omarchy.
 
 | Task category | Model (Ollama tag) | Host | ~VRAM (Q4) | Why |
 |---|---|---|---|---|
-| **Trivial / fast chat** (greetings, quick facts, reformat) | `qwen3:1.7b` | Sadida | ~1.3 GB | 25–40 tok/s, loads instantly; good enough for throwaway turns |
-| **General + tool calling** (default agent loop) | `qwen3.5:4b` (current) or `gemma4:e4b` | Sadida | ~3 GB | reliable tool/JSON; Gemma 4 has native function calling |
+| **Trivial / fast chat** (greetings, quick facts, reformat) | `qwen3:1.7b` | Sadida | 1.7 GB measured | 100% GPU; also the always-on tool-calling fallback when omarchy is off |
+| **General + tool calling** (default agent loop) | `qwen3:8b` | omarchy | ~6 GB | measured 100% GPU; the tier that matters most for agentic work |
 | **Reasoning / math / logic** | `deepseek-r1:8b` | omarchy | ~5.2 GB | R1 distill, chain-of-thought; 88% MATH-500 (beats general 7–8B) |
 | **Coding / technical** | `qwen2.5-coder:7b` | omarchy | ~4.7 GB | dense coder that fits 8 GB (qwen3-coder only ships 30B/480B MoE — too big) |
 | **Planning / compose-new** | Claude (`ASSISTANT_MODEL`) | cloud | — | breaking a goal into a project + subtasks; needs to invent clean structure |
@@ -33,7 +33,8 @@ The classifier is pure heuristics (keywords + length), evaluated in this order:
 1. **Planning** ("planifica", "desglosa en tareas", "hoja de ruta", "roadmap") →
    `complex` → **Claude first**. This is the "invent something new" case.
 2. **Explicit `/tool …` invocations** and **node commands** (a node name +
-   infra word, or `run_on_node`) → `general` → **local `qwen3.5:4b`**, Claude only
+   infra word, or `run_on_node`) → `general` → **the local tool model** (`qwen3:8b`
+   on omarchy, `qwen3:1.7b` on Sadida), Claude only
    as fallback. Deliberately *not* the coder: a small coding model tends to answer
    with text instead of calling the tool.
 3. **Coding** (code fences, stack traces, language/tooling keywords) → `coding`.
@@ -174,6 +175,34 @@ Set it without touching code via `MODEL_ROUTES`:
 ```
 MODEL_ROUTES={"general":[{"host":"omarchy","model":"qwen3.5:9b"},{"host":"sadida","model":"qwen3.5:4b"},{"claude":true}]}
 ```
+
+### Measured outcome (what actually happened)
+
+The 9B recommendation did **not** survive contact with the hardware. Real
+`ollama ps` numbers:
+
+| Model | Host | Reported size | Result |
+|---|---|---|---|
+| `qwen3.5:4b` | Sadida (4 GB) | 3.8 GB | **43% CPU** — never fit; removed |
+| `qwen3.5:9b` | omarchy (8 GB) | 6.3 GB | 32% CPU — doesn't fit |
+| `qwen3:8b` @ ctx 8192 | omarchy | 6.0 GB | 18% CPU |
+| `qwen3:8b` @ ctx 4096 | omarchy | 5.7 GB | 12% CPU |
+| **`qwen3:8b` @ ctx 8192, Whisper stopped** | omarchy | — | **100% GPU ✅** |
+| **`qwen3:1.7b`** | Sadida | 1.7 GB | **100% GPU ✅** |
+| `gemma4:e2b` | Sadida | 4.6 GB on disk | too big (its `ollama ps` size of 288 MB is a bogus reading for multimodal models) |
+
+Three lessons:
+1. **`ollama ps` SIZE includes the KV cache and compute buffers**, not just weights —
+   and for multimodal models it under-reports badly. Trust `nvidia-smi`.
+2. **Usable VRAM is well under the sticker number.** omarchy's 8 GB had ~1.9 GB taken
+   by the desktop, Opera, the terminal and — the big one — **Rebeca's own Whisper
+   container holding 708 MB**. Voice and the LLM were competing for the same GPU;
+   stopping `whisper_stt` on omarchy was what finally made the 8B fit.
+3. **Context length is paid up front.** With 23 tool schemas in every request, 4096 is
+   genuinely tight for agentic turns, so 8192 is the floor worth defending — which is
+   exactly why freeing that 708 MB mattered more than shrinking the context.
+
+Final layout: voice lives on Sadida only; omarchy runs the tool-calling tier.
 
 ### Evaluated and rejected
 

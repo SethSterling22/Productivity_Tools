@@ -19,7 +19,7 @@
  *   HERMES_FS_ALLOW_WRITE_ANYWHERE fs_write may target any path (not just /workspace/output)
  *   HERMES_FS_ALLOW_DELETE         enable the fs_delete tool
  *   HERMES_DISABLE_CLAUDE_FALLBACK do NOT fall back to Ollama when Claude is unavailable
- *   HERMES_CLAUDE_FALLBACK_MODEL   Ollama model used as the Claude fallback (default: qwen3.5:4b)
+ *   HERMES_CLAUDE_FALLBACK_MODEL   Ollama model used as the Claude fallback (default: qwen3:1.7b)
  *
  * ── Second brain (git-backed Obsidian vault) ──────────────────────────────────
  * The note_save tool writes Markdown notes into a git repository (the "brain")
@@ -61,7 +61,7 @@ const FS_UNRESTRICTED         = bool(process.env.HERMES_FS_UNRESTRICTED);
 const FS_ALLOW_WRITE_ANYWHERE = bool(process.env.HERMES_FS_ALLOW_WRITE_ANYWHERE) || FS_UNRESTRICTED;
 const FS_ALLOW_DELETE         = bool(process.env.HERMES_FS_ALLOW_DELETE);
 const DISABLE_CLAUDE_FALLBACK = bool(process.env.HERMES_DISABLE_CLAUDE_FALLBACK);
-const CLAUDE_FALLBACK_MODEL   = process.env.HERMES_CLAUDE_FALLBACK_MODEL || "qwen3.5:4b";
+const CLAUDE_FALLBACK_MODEL   = process.env.HERMES_CLAUDE_FALLBACK_MODEL || "qwen3:1.7b";
 
 // ── Second brain (git-backed vault) ──────────────────────────────────────────
 const BRAIN_ROOT       = process.env.HERMES_BRAIN_ROOT || path.join(WORKSPACE_ROOT, "brain");
@@ -112,7 +112,7 @@ async function ollamaChat({ prompt, model, system, temperature }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: model || "qwen3.5:4b",
+      model: model || "qwen3:1.7b",
       stream: false,
       messages,
       options: { temperature: temperature ?? 0.7 },

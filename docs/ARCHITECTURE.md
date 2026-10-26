@@ -22,8 +22,8 @@ viewers).
 | **Qdrant** | qdrant | `6333` | `n8n_network` | Vector DB for RAG over the second brain. |
 | **SearXNG** | searxng | `8080` | `n8n_network` | Self-hosted metasearch for the `web_search` tool. |
 | **Ollama** | external | `11434` | tailnet (sadida, omarchy) | Local LLMs (task router) + embeddings (`nomic-embed-text`). |
-| **Whisper (STT)** | external | `8100` | tailnet (omarchy/sadida) | Speech-to-text, preference-ordered with failover. |
-| **Piper (TTS)** | external | `8200` | tailnet (omarchy/sadida) | Text-to-speech, same failover. |
+| **Whisper (STT)** | external | `8100` | tailnet (**sadida**) | Speech-to-text. Kept off omarchy so it doesn't hold VRAM the LLM needs. |
+| **Piper (TTS)** | external | `8200` | tailnet (**sadida**) | Text-to-speech. |
 | **Nextcloud** | external | — | tailnet (aery) | File storage; WebDAV + OCS for the Files widget/tools. |
 | **Prometheus** | external | `9090` | tailnet (ocra) | Homelab metrics for the Homelab widget + `query_metrics`. |
 | **Homelab nodes** | external | `22` | tailnet | SSH targets (`ocra`, `sadida`, `omarchy`, `aery`, `sram`, `sacro`, `xelor`) for the hub terminal + `run_on_node`. |
@@ -178,11 +178,15 @@ skipped instantly; on failure the next target is tried.
 
 | Category | Chain |
 |---|---|
-| trivial | `qwen3:1.7b` (sadida) → `qwen3.5:4b` → Claude |
-| general · explicit `/tool` · node commands | `qwen3.5:4b` (sadida) → Claude |
+| trivial | `qwen3:1.7b` (sadida) → Claude |
+| general · explicit `/tool` · node commands | `qwen3:8b` (omarchy) → `qwen3:1.7b` (sadida) → Claude |
 | reasoning | `deepseek-r1:8b` (omarchy) → `deepseek-r1:1.5b` (sadida) → Claude |
 | coding | `qwen2.5-coder:7b` (omarchy) → `qwen2.5-coder:3b` (sadida) → Claude |
-| planning / compose-new | Claude → `qwen3.5:4b` |
+| planning / compose-new | Claude → `qwen3:8b` |
+
+Every entry is verified to sit **100% on GPU**: ≤ ~2.5 GB on Sadida (4 GB) and
+≤ ~6 GB on omarchy (8 GB, minus the desktop). Voice runs on Sadida only so it does
+not take VRAM from omarchy's tool-calling model. Claude is `claude-sonnet-5-5`.
 
 `GET /models` auto-discovers what each host has pulled; the dashboard's model
 picker can force any of them (no fallback, for A/B testing) and doubles as the

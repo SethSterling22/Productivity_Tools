@@ -85,8 +85,8 @@ flowchart LR
   %% ── LLMs ──
   subgraph llm["LLMs (task router, local-first)"]
     CLAUDE["Claude API<br/>claude-sonnet-5-5"]
-    OLLS["Ollama · Sadida<br/>qwen3.5 · qwen3 · deepseek-r1 · qwen2.5-coder · nomic-embed"]
-    OLLO["Ollama · omarchy<br/>deepseek-r1:8b · qwen2.5-coder:7b"]
+    OLLS["Ollama · Sadida (4 GB)<br/>qwen3:1.7b · deepseek-r1:1.5b<br/>qwen2.5-coder:3b · nomic-embed"]
+    OLLO["Ollama · omarchy (8 GB)<br/>qwen3:8b · deepseek-r1:8b<br/>qwen2.5-coder:7b"]
   end
   AC -->|"HTTPS (complex)"| CLAUDE
   AC -->|"/api/chat"| OLLS
@@ -189,11 +189,21 @@ picks a per-turn failover chain across hosts:
 
 | Category | Chain |
 | --- | --- |
-| trivial (greetings) | `qwen3:1.7b` (sadida) → `qwen3.5:4b` → Claude |
-| general · tools · node commands | `qwen3.5:4b` (sadida) → Claude |
+| trivial (greetings) | `qwen3:1.7b` (sadida) → Claude |
+| general · tools · node commands | `qwen3:8b` (omarchy) → `qwen3:1.7b` (sadida) → Claude |
 | reasoning | `deepseek-r1:8b` (omarchy) → `deepseek-r1:1.5b` (sadida) → Claude |
 | coding | `qwen2.5-coder:7b` (omarchy) → `qwen2.5-coder:3b` (sadida) → Claude |
-| planning / compose-new | Claude → `qwen3.5:4b` |
+| planning / compose-new | Claude → `qwen3:8b` |
+
+Every model in that table was verified to run **100% on GPU** on its host — a model
+that spills to CPU is slower than the smaller one that fits. The hard limits are
+**≤ ~2.5 GB on Sadida** (RTX 3050, 4 GB) and **≤ ~6 GB on omarchy** (RTX 3060 Ti,
+8 GB, minus the desktop). Ollama is tuned per host with
+`OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_KEEP_ALIVE=-1`
+and `OLLAMA_CONTEXT_LENGTH=8192` — 8192 is the floor worth defending, because the
+tool schemas alone take a big slice of every request. Voice (Whisper/Piper) runs on
+**Sadida only**, so it doesn't compete for omarchy's VRAM. Measurements and the
+reasoning behind each choice: [`docs/MODEL_ROUTING.md`](docs/MODEL_ROUTING.md).
 
 Ollama hosts are health-gated, so a powered-off node is skipped instantly. The
 dashboard's **model picker** shows which model answered and lets you force any
@@ -308,7 +318,7 @@ infrastructure-specific values (search the repo for each):
 | Value (current) | Where | Change to |
 | --- | --- | --- |
 | `sadida.stegosaurus-panga.ts.net:11434` (Ollama URL) | `.env.example`, `gateway.js`, `server.js`, `hermes-stack.yaml` | Your Ollama host:port. |
-| `qwen3:1.7b`, `qwen3.5:4b` (models) | workflow, gateway/server defaults | Whatever models you pulled. |
+| `qwen3:1.7b`, `qwen3:8b` (models) | workflow, gateway/server defaults | Whatever models you pulled. |
 | `127.0.0.1:8080` (Hermes URL in n8n) | workflow HTTP nodes | Keep `127.0.0.1` **only** if n8n and Hermes share a network namespace (Compose `network_mode: service:tailscale`). Otherwise use the service hostname. |
 | Tailscale sidecar + `TS_AUTHKEY` | `docker-compose.yaml`, `.env.example` | Optional — remove the sidecar if you are not on Tailscale. |
 | NFS `storageClassName: nfs-client`, `ReadWriteMany` PVC | `hermes-stack.yaml` | Your cluster's storage class (k8s path only). |

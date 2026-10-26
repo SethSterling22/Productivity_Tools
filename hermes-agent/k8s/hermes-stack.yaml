@@ -43,7 +43,7 @@ data:
   HERMES_FS_ALLOW_WRITE_ANYWHERE: "false"
   HERMES_FS_ALLOW_DELETE: "false"
   # Local model used when Claude is unavailable (empty ANTHROPIC_API_KEY -> fallback).
-  HERMES_CLAUDE_FALLBACK_MODEL: "qwen3.5:4b"
+  HERMES_CLAUDE_FALLBACK_MODEL: "qwen3:1.7b"
 
 ---
 # PersistentVolumeClaim for the sandbox workspace
@@ -192,5 +192,5 @@ spec:
 # Hermes reaches it via the ConfigMap's OLLAMA_URL (Sadida's Tailscale MagicDNS).
 # Models are installed directly on Sadida:
 #   ollama pull qwen3:1.7b
-#   ollama pull qwen3.5:4b
+#   ollama pull qwen3:1.7b
 # ─────────────────────────────────────────────────────────────────────────────

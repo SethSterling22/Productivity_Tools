@@ -26,7 +26,7 @@ export const config = {
   maxTokens: Number(process.env.ASSISTANT_MAX_TOKENS || 1024),
 
   ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
-  ollamaModel: process.env.ASSISTANT_FALLBACK_MODEL || "qwen3.5:4b",
+  ollamaModel: process.env.ASSISTANT_FALLBACK_MODEL || "qwen3:1.7b",
 
   // ── Multi-model routing ────────────────────────────────────────────────────
   // Task-specialized routing across Ollama hosts, with Claude as last resort.
