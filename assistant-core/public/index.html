@@ -861,7 +861,14 @@ $("convosSearch").oninput = renderSessions;
 $("convosNew").onclick = () => { newChat(); closeAllDrawers(); };
 // ── Slash-command autocomplete (type "/" at the start of the message) ──
 let allTools = [], slashFlat = [], slashSel = 0;
-const SLASH_ORDER = ["Linear", "Calendar", "Notes / Brain", "Web", "Homelab", "Nodes", "Files", "Other"];
+const SLASH_ORDER = ["AI", "Linear", "Calendar", "Notes / Brain", "Web", "Homelab", "Nodes", "Files", "Other"];
+// Pseudo-commands handled by the agent (not tools): these DO use the model.
+const AI_COMMANDS = [
+  { name: "node", category: "AI", description: "Investigate/act on a node with AI: runs the read-only commands it needs and summarizes. Changes require your confirmation.",
+    input_schema: { type: "object", properties: { node: {}, request: {} }, required: ["node", "request"] } },
+  { name: "ask", category: "AI", description: "Plain chat with the assistant (skips command parsing).",
+    input_schema: { type: "object", properties: { text: {} }, required: ["text"] } },
+];
 function toolSigArgs(t) {
   const props = (t.input_schema && t.input_schema.properties) || {};
   const req = (t.input_schema && t.input_schema.required) || [];
@@ -872,7 +879,7 @@ function slashOpen() { return $("slashMenu").classList.contains("show"); }
 function hideSlash() { $("slashMenu").classList.remove("show"); }
 function renderSlash(q) {
   q = (q || "").toLowerCase();
-  const matches = allTools.filter((t) => t.name.toLowerCase().includes(q));
+  const matches = AI_COMMANDS.concat(allTools).filter((t) => t.name.toLowerCase().includes(q));
   if (!matches.length) { hideSlash(); return; }
   if (slashSel >= matches.length) slashSel = 0;
   const groups = {};

@@ -16,6 +16,38 @@ import * as memory from "./memory.js";
 // Argument mapping uses the tool's own input_schema: required properties are
 // filled in order and the LAST one absorbs the remaining text, so
 // "/run_on_node ocra docker ps -a" -> { node: "ocra", command: "docker ps -a" }.
+// AI-assisted commands: the opposite of the deterministic ones. They do NOT map
+// to a single tool — they rewrite the message and let the agent loop investigate
+// with whatever tools it needs.
+//   /node <host> <request>  -> reason about a node, running read-only commands
+//   /ask  <text>            -> plain chat (escape hatch, skips command parsing)
+const AI_COMMANDS = {
+  node: (rest) => {
+    const parts = rest.trim().split(/\s+/);
+    const node = parts.shift() || "";
+    const req = parts.join(" ");
+    if (!node || !req) return "Uso: /node <nodo> <qué quieres saber o hacer>";
+    return (
+      `En el nodo "${node}": ${req}\n\n` +
+      "Usa run_on_node sobre ese nodo para averiguarlo. Encadena los comandos de " +
+      "solo lectura que necesites, y responde con la conclusión resumida (no solo " +
+      "la salida cruda). Si hiciera falta un comando que modifica el nodo, " +
+      "muéstramelo y pídeme confirmación antes de ejecutarlo."
+    );
+  },
+  ask: (rest) => rest,
+};
+
+// Returns the rewritten prompt when the message is an AI command, else null.
+function parseAiCommand(message) {
+  const m = /^\/([A-Za-z_][\w]*)\s*([\s\S]*)$/.exec(String(message || "").trim());
+  if (!m) return null;
+  const fn = AI_COMMANDS[m[1].toLowerCase()];
+  if (!fn) return null;
+  const rewritten = fn((m[2] || "").trim());
+  return rewritten ? { name: m[1].toLowerCase(), prompt: rewritten } : null;
+}
+
 function parseSlashCommand(message) {
   const m = /^\/([A-Za-z_][\w]*)\s*([\s\S]*)$/.exec(String(message || "").trim());
   if (!m) return null;
@@ -75,8 +107,12 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
   // Default conversation name = first user message (only if not named yet).
   await memory.setTitleIfEmpty(sessionId, userMessage.slice(0, 60));
 
+  // "/node", "/ask" -> AI-assisted: rewrite the prompt, then run the normal loop.
+  const ai = parseAiCommand(userMessage);
+  const effectiveMessage = ai ? ai.prompt : userMessage;
+
   // Explicit "/tool args" -> run exactly that tool, no model, no history bleed.
-  const cmd = parseSlashCommand(userMessage);
+  const cmd = ai ? null : parseSlashCommand(userMessage);
   if (cmd) {
     emit({ type: "route", category: "command" });
     emit({ type: "model", provider: "direct", model: "sin IA" });
@@ -102,7 +138,11 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
   const context = await memory.getContext(sessionId);
   const messages = context.map((m) => ({ role: m.role, content: m.content }));
   if (!messages.length || messages[messages.length - 1].role !== "user") {
-    messages.push({ role: "user", content: userMessage });
+    messages.push({ role: "user", content: effectiveMessage });
+  } else if (ai) {
+    // Memory keeps what the user typed ("/node ocra …"); the model gets the
+    // expanded instruction for this turn.
+    messages[messages.length - 1] = { role: "user", content: effectiveMessage };
   }
 
   const tools = llmTools(ch);
@@ -117,7 +157,7 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
     chain = forced;
     emit({ type: "route", category: "manual" });
   } else if (config.modelRouting) {
-    const route = routeFor(userMessage);
+    const route = routeFor(effectiveMessage);
     chain = route.chain;
     emit({ type: "route", category: route.category });
   }
