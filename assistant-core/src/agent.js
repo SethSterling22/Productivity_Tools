@@ -29,10 +29,11 @@ const AI_COMMANDS = {
     if (!node || !req) return "Uso: /node <nodo> <qué quieres saber o hacer>";
     return (
       `En el nodo "${node}": ${req}\n\n` +
-      "Usa run_on_node sobre ese nodo para averiguarlo. Encadena los comandos de " +
-      "solo lectura que necesites, y responde con la conclusión resumida (no solo " +
-      "la salida cruda). Si hiciera falta un comando que modifica el nodo, " +
-      "muéstramelo y pídeme confirmación antes de ejecutarlo."
+      "LLAMA a run_on_node AHORA con node=\"" + node + "\" y el comando que haga falta. " +
+      "NO anuncies lo que vas a hacer ni describas los comandos: ejecútalos. " +
+      "Encadena los comandos de solo lectura que necesites (puedes usar && y |), " +
+      "y cuando tengas la salida responde con la conclusión resumida. Solo si hace " +
+      "falta un comando que modifica el nodo, muéstramelo y pide confirmación."
     );
   },
   ask: (rest) => rest,
@@ -79,6 +80,11 @@ function parseSlashCommand(message) {
   const missing = required.filter((r) => !input[r]);
   return { tool, input, missing };
 }
+
+// Text that merely announces an action ("voy a ejecutar…", "let me run…"), which
+// small models emit instead of actually calling the tool.
+// (no trailing \b: an accented ending like "ejecutaré" is not a word char)
+const ANNOUNCE_RE = /(^|\s)(voy a (ejecutar|correr|revisar|verificar|consultar)|vamos a (ejecutar|correr)|proced(o|amos) a|ejecutar[ée]|ejecuto ahora|déjame (ejecutar|revisar)|let me (run|check)|i(?:'| wi)ll (run|check|execute)|a continuaci[óo]n)/i;
 
 // Render a tool result as readable markdown for the chat.
 function formatToolResult(name, res) {
@@ -162,6 +168,7 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
     emit({ type: "route", category: route.category });
   }
   let announced = false;
+  let nudged = false;
 
   // Give the model the current date/time (LLMs don't know it) so it resolves
   // "today"/"tomorrow" correctly and emits ISO 8601 with the right date/offset.
@@ -214,6 +221,37 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
       }
       messages.push({ role: "user", content: resultBlocks });
       continue; // loop so the model can use the tool results
+    }
+
+    // Small local models often ANNOUNCE a tool call ("voy a ejecutar…") and then
+    // end the turn without emitting one. Nudge once instead of returning the
+    // announcement as if it were the answer.
+    if (!nudged && tools.length && text && ANNOUNCE_RE.test(text.trim())) {
+      nudged = true;
+      messages.push({ role: "assistant", content: text });
+      messages.push({
+        role: "user",
+        content:
+          "You announced an action but did not call any tool. Call the appropriate " +
+          "tool NOW with the exact arguments, then answer with the result. Do not " +
+          "describe what you are going to do.",
+      });
+      continue;
+    }
+
+    // Small models sometimes ANNOUNCE an action ("voy a ejecutar…") and end the
+    // turn without emitting a tool call. Nudge once instead of returning that.
+    if (!nudged && tools.length && ANNOUNCE_RE.test(text || "")) {
+      nudged = true;
+      messages.push({ role: "assistant", content: text || "" });
+      messages.push({
+        role: "user",
+        content:
+          "Dijiste que ibas a ejecutarlo pero no llamaste a ninguna herramienta. " +
+          "Llama ahora a la herramienta correspondiente con los argumentos concretos. " +
+          "No describas el comando: ejecútalo.",
+      });
+      continue;
     }
 
     // No tool calls -> this is the final answer (or a clarifying question).
