@@ -1,0 +1,70 @@
+{
+  "name": "Watchdog — Google Calendar credential",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "triggerAtHour": 8, "triggerAtMinute": 10 }] }
+      },
+      "id": "wd-cron",
+      "name": "Daily 08:10",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": { "__rl": true, "mode": "list", "value": "primary" },
+        "returnAll": false,
+        "limit": 1,
+        "options": {
+          "timeMin": "={{ $now.toISO() }}",
+          "timeMax": "={{ $now.plus({ days: 1 }).toISO() }}",
+          "singleEvents": true
+        }
+      },
+      "id": "wd-probe",
+      "name": "Calendar — probe",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [480, 300],
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput",
+      "credentials": { "googleCalendarOAuth2Api": { "name": "Google Calendar" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reached only when the Google Calendar credential FAILED (error branch).\nconst e = $input.first().json || {};\nconst detail = String(e.message || e.error || JSON.stringify(e)).slice(0, 300);\nconst text = [\n  '\\u26a0\\ufe0f Google Calendar credential FAILED',\n  '',\n  detail,\n  '',\n  'Fix: n8n > Credentials > \"Google Calendar\" > Reconnect.',\n  'If this repeats weekly, the OAuth consent screen is still in Testing mode \\u2014 publish it to Production.'\n].join('\\n');\nreturn [{ json: { text } }];"
+      },
+      "id": "wd-alert",
+      "name": "Build alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 400]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID || 'REPLACE_WITH_YOUR_CHAT_ID' }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "id": "wd-telegram",
+      "name": "Telegram — alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [960, 400],
+      "credentials": { "telegramApi": { "name": "Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Daily 08:10": { "main": [[{ "node": "Calendar — probe", "type": "main", "index": 0 }]] },
+    "Calendar — probe": {
+      "main": [
+        [],
+        [{ "node": "Build alert", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build alert": { "main": [[{ "node": "Telegram — alert", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
