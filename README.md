@@ -151,6 +151,7 @@ flowchart LR
 | **Tool manifest** | `assistant-core/tools.manifest.json` | Declares every capability (with `category`); hot-reloaded. See `docs/ADDING_A_TOOL.md`. |
 | **n8n Brain workflow (v3)** | `n8n/cerebro_workflow_v3.json` | Telegram entry point — hybrid thrifty router (see below). `cerebro_workflow_v2.json` is the legacy version. |
 | **n8n tool workflows** | `n8n/tools/` | Webhook sub-workflows: `assistant_tools` (task/event), `linear_tasks` (list/projects/update/complete/create_project), `linear_whoami`, `_template`. |
+| **n8n scheduled jobs** | `n8n/tools/` | `brain_sync` (pull the vault from GitHub every 15 min → reindex RAG when it changed), `google_cred_watchdog` (daily probe of the Google Calendar credential → Telegram alert on failure). |
 | **Hermes gateway** | `hermes-agent/mcp-server/gateway.js` | HTTP server on `:8080`; brain/fs/shell tools via `POST /tool/:name`. |
 | **Hermes MCP server** | `hermes-agent/mcp-server/server.js` | Native stdio MCP server (same tools) for MCP-native clients. |
 | **Voice services** | `voice-services/` | Whisper (STT) + Piper (TTS) on GPU hosts (omarchy/sadida), with health-based failover. |
@@ -208,7 +209,7 @@ Every capability is a descriptor in `tools.manifest.json`, grouped by `category`
 | --- | --- | --- |
 | **Linear** | `create_task`, `create_plan`, `create_project`, `list_tasks`, `list_projects`, `update_task`, `complete_task` | Linear GraphQL via n8n (+ a `create_plan` builtin that composes parent + subtasks) |
 | **Calendar** | `create_event`, `list_today_events` | Google Calendar via n8n (OAuth2) |
-| **Notes / Brain** | `save_note`, `search_brain`, `search_brain_semantic` | Hermes → git vault; RAG via Qdrant + Ollama embeddings |
+| **Notes / Brain** | `save_note`, `quick_note`, `brain_pull`, `search_brain`, `search_brain_semantic` | Hermes → git vault; RAG via Qdrant + Ollama embeddings |
 | **Web** | `web_search` | Self-hosted SearXNG |
 | **Homelab** | `query_metrics` | Prometheus (PromQL) |
 | **Files** | `list_files`, `create_folder`, `move_file`, `delete_file`, `share_file`, `storage_usage` | Nextcloud (WebDAV + OCS) |
@@ -217,6 +218,36 @@ Every capability is a descriptor in `tools.manifest.json`, grouped by `category`
 Behavioral guardrails: **planning** proposes the plan and waits for approval before
 creating anything; **`run_on_node`** runs read-only commands directly but refuses
 state-changing ones unless the user explicitly confirmed the exact command.
+
+### Telegram commands
+
+Zero-AI fast paths (dispatched straight to the tool): `/qn`, `/note`, `/task`,
+`/tasks`, `/today`, `/files`.
+Routed through Rebeca (local model first): `/plan`, `/calendar`, `/brain`, `/web`,
+plus any free text or voice note.
+
+| Command | What it does |
+| --- | --- |
+| `/qn <text>` | Append one line to this month's quick-notes checklist |
+| `/note <text>` | Save a full note in the Brain (`@folder` to route, `#tags` to label) |
+| `/task <title>` | Create a Linear task (auto-assigned) |
+| `/tasks` | List tasks grouped by project, subtasks nested |
+| `/today` | Upcoming calendar events |
+| `/files [folder]` | List files in Nextcloud |
+| `/plan <goal>` | Propose project + parent + subtasks, then create on approval |
+| `/calendar <text>` | Create an event from natural language |
+| `/brain <question>` | Answer from the notes (semantic search) |
+| `/web <query>` | Search the web |
+
+Aliases: `/quick`=`/qn`, `/agenda`=`/today`, `/cal`=`/calendar`, `/show_brain`=`/brain`.
+
+### Brain sync (two-way)
+
+Notes are written by Hermes into a git clone of the vault and **pushed** to GitHub
+(auto-rebasing if the remote moved ahead). Because the vault is also edited from
+Obsidian on other devices, a scheduled job **pulls** it back every 15 minutes and
+reindexes the RAG only when something actually changed. `brain_pull` forces it on
+demand.
 
 Planned: content drafting, progress logging, wake word, streaming TTS, file
 distribution to node `Shared/` folders (see [`docs/FILES_NEXTCLOUD_PLAN.md`](docs/FILES_NEXTCLOUD_PLAN.md)).
@@ -315,7 +346,8 @@ Productivity_Tools/
 ├── n8n/
 │   ├── cerebro_workflow_v3.json   # Telegram → hybrid router (current)
 │   ├── cerebro_workflow_v2.json   # legacy
-│   ├── tools/                     # assistant_tools, linear_tasks, linear_whoami, _template
+│   ├── tools/                     # assistant_tools, linear_tasks, linear_whoami,
+│   │                              #   brain_sync, google_cred_watchdog, _template
 │   ├── docker-compose.yaml        # the whole stack
 │   └── .env.example
 ├── voice-services/           # whisper/ + piper/ (GPU hosts)
