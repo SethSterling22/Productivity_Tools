@@ -5,8 +5,66 @@
 import { config } from "./config.js";
 import { runModel } from "./llm.js";
 import { routeFor, overrideChain } from "./router.js";
-import { llmTools, dispatch } from "./tools.js";
+import { llmTools, dispatch, listTools } from "./tools.js";
 import * as memory from "./memory.js";
+
+// ── Deterministic slash commands ────────────────────────────────────────────
+// "/tool arg1 rest of the args" is dispatched straight to the tool, with NO model
+// involved. Without this the LLM re-interprets the command (and the conversation
+// history) and may run something else entirely.
+//
+// Argument mapping uses the tool's own input_schema: required properties are
+// filled in order and the LAST one absorbs the remaining text, so
+// "/run_on_node ocra docker ps -a" -> { node: "ocra", command: "docker ps -a" }.
+function parseSlashCommand(message) {
+  const m = /^\/([A-Za-z_][\w]*)\s*([\s\S]*)$/.exec(String(message || "").trim());
+  if (!m) return null;
+  const tool = listTools().find((t) => t.name === m[1]);
+  if (!tool) return null;
+
+  const rest = (m[2] || "").trim();
+  const props = (tool.input_schema && tool.input_schema.properties) || {};
+  const required = (tool.input_schema && tool.input_schema.required) || [];
+  // No required fields -> optionally fill the first declared property.
+  const keys = required.length ? required : Object.keys(props).slice(0, 1);
+
+  const input = {};
+  if (keys.length && rest) {
+    if (keys.length === 1) {
+      input[keys[0]] = rest;
+    } else {
+      const parts = rest.split(/\s+/);
+      for (let i = 0; i < keys.length - 1; i++) input[keys[i]] = parts.shift() || "";
+      input[keys[keys.length - 1]] = parts.join(" ");
+    }
+  }
+  for (const k of Object.keys(input)) {
+    if (props[k] && props[k].type === "integer") {
+      const n = parseInt(input[k], 10);
+      if (!Number.isNaN(n)) input[k] = n;
+    }
+  }
+  const missing = required.filter((r) => !input[r]);
+  return { tool, input, missing };
+}
+
+// Render a tool result as readable markdown for the chat.
+function formatToolResult(name, res) {
+  if (!res || typeof res !== "object") return "```\n" + String(res) + "\n```";
+  if (res.ok === false) return `⚠ **${name}**: ${res.error || "failed"}`;
+  // Shell output (run_on_node)
+  if (res.stdout !== undefined || res.stderr !== undefined) {
+    const out = (res.stdout || "").trimEnd();
+    const err = (res.stderr || "").trimEnd();
+    let s = `**${res.node || name}** · \`${res.command || ""}\`${res.code ? ` (exit ${res.code})` : ""}\n`;
+    s += "```\n" + (out || "(sin salida)") + "\n```";
+    if (err) s += "\n_stderr:_\n```\n" + err + "\n```";
+    return s;
+  }
+  if (res.result) return `✅ ${res.result}`;
+  const json = JSON.stringify(res, null, 2);
+  return "```json\n" + (json.length > 3000 ? json.slice(0, 3000) + "\n…" : json) + "\n```";
+}
 
 export async function runAgent({ sessionId, channel, userMessage, onEvent, model }) {
   const emit = onEvent || (() => {});
@@ -16,6 +74,28 @@ export async function runAgent({ sessionId, channel, userMessage, onEvent, model
   await memory.append({ sessionId, role: "user", content: userMessage });
   // Default conversation name = first user message (only if not named yet).
   await memory.setTitleIfEmpty(sessionId, userMessage.slice(0, 60));
+
+  // Explicit "/tool args" -> run exactly that tool, no model, no history bleed.
+  const cmd = parseSlashCommand(userMessage);
+  if (cmd) {
+    emit({ type: "route", category: "command" });
+    emit({ type: "model", provider: "direct", model: "sin IA" });
+    let text;
+    if (cmd.missing.length) {
+      const sig = (cmd.tool.input_schema.required || []).join(", ");
+      text = `⚠ \`/${cmd.tool.name}\` necesita: **${cmd.missing.join(", ")}**\n\nUso: \`/${cmd.tool.name} ${sig}\``;
+    } else {
+      emit({ type: "tool_call", name: cmd.tool.name, input: cmd.input });
+      const result = await dispatch(cmd.tool.name, cmd.input);
+      emit({ type: "tool_result", name: cmd.tool.name, result });
+      await memory.append({ sessionId, role: "tool", toolName: cmd.tool.name, toolResult: result });
+      text = formatToolResult(cmd.tool.name, result);
+    }
+    await memory.append({ sessionId, role: "assistant", content: text });
+    emit({ type: "text", text });
+    emit({ type: "done", text });
+    return text;
+  }
 
   // Prior context (already includes the user message we just stored), as
   // simple role/content turns; the loop appends tool_use/tool_result blocks.
