@@ -15,11 +15,20 @@ links, and clean APIs — **WebDAV** for files (`/remote.php/dav/files/<user>/`)
 Rebuilding this ourselves would reinvent years of work. So: **Nextcloud is the store
 + manager; we build the Rebeca integration + the node-distribution piece.**
 
+## Status (Oct 2026)
+
+**Part 1 is BUILT and running** (Nextcloud client, `/files/*` routes, dashboard
+widget, `Files` tools). **Part 2 (distribution to nodes) is still a plan** — not
+implemented; the transport is undecided.
+
 ## Scope (decided)
 
-- ✅ Dashboard **files widget** (browse, drag & drop upload, download, move, delete).
-- ✅ Rebeca **chat/voice tools** (upload/move/share/search/storage).
-- ✅ **Distribute** files to other Tailnet nodes' `Shared/` dir (send, modify, delete).
+- ✅ **DONE** — Dashboard **files widget** (browse, drag & drop upload, download,
+  share link, delete, new folder).
+- ✅ **DONE** — Rebeca **chat/voice tools** (`list_files`, `create_folder`,
+  `move_file`, `delete_file`, `share_file`, `storage_usage`).
+- ⬜ **PENDING** — **Distribute** files to other Tailnet nodes' `Shared/` dir
+  (send, modify, delete). Transport still to pick (A/B/C below).
 - ❌ (not now) RAG Q&A over Nextcloud docs — easy to add later (reuses the current
   RAG), out of this scope.
 
@@ -146,13 +155,20 @@ target), a node registry (name → tailnet host → transport), and Rebeca picks
 
 ## Phased plan
 
-1. **Nextcloud client + read-only widget** — `/files/list`, `/files/download`,
-   `/files/storage`; widget browse + download. Validate WebDAV/app-password.
-2. **Write ops** — upload (drag & drop, chunked), mkdir, move, delete; widget actions.
-3. **Sharing** — `share_file` (OCS link) + widget "share".
-4. **Rebeca tools** — manifest `Files` category (list/upload/move/delete/share/storage).
-5. **Distribution** — pick A/B/C per node; node registry; `distribute_file` tool +
+1. ✅ **Nextcloud client + read-only widget** — `/files/list`, `/files/download`,
+   `/files/storage`; widget browse + download. WebDAV/app-password validated.
+2. ✅ **Write ops** — upload (drag & drop), mkdir, move, delete; widget actions.
+   (Chunked upload for very large files is still the simple PUT path — fine so far.)
+3. ✅ **Sharing** — `share_file` (OCS link) + widget share → copies the link to the
+   clipboard with a toast.
+4. ✅ **Rebeca tools** — manifest `Files` category (list/folder/move/delete/share/storage).
+5. ⬜ **Distribution** — pick A/B/C per node; node registry; `distribute_file` tool +
    widget "send to node…"; finish/harden SwapFile if we go with B.
+
+> Note: since this plan was written, Rebeca gained **SSH access to the nodes**
+> (`run_on_node` + the hub terminal, user `rebeca` with a dedicated key). That makes
+> **Option C** cheaper than originally assessed — `distribute_file` could reuse that
+> existing SSH path instead of widening Hermes' surface.
 6. (Optional later) RAG over selected Nextcloud folders.
 
 ## Open decisions

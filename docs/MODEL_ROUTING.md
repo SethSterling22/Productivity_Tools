@@ -24,7 +24,22 @@ always-on Sadida and the heavy specialists on omarchy.
 | **General + tool calling** (default agent loop) | `qwen3.5:4b` (current) or `gemma4:e4b` | Sadida | ~3 GB | reliable tool/JSON; Gemma 4 has native function calling |
 | **Reasoning / math / logic** | `deepseek-r1:8b` | omarchy | ~5.2 GB | R1 distill, chain-of-thought; 88% MATH-500 (beats general 7–8B) |
 | **Coding / technical** | `qwen2.5-coder:7b` | omarchy | ~4.7 GB | dense coder that fits 8 GB (qwen3-coder only ships 30B/480B MoE — too big) |
-| **Most complex / fallback** | Claude (`ASSISTANT_MODEL`) | cloud | — | multi-step, ambiguous, high-stakes; last resort |
+| **Planning / compose-new** | Claude (`ASSISTANT_MODEL`) | cloud | — | breaking a goal into a project + subtasks; needs to invent clean structure |
+
+### Classification rules (as implemented)
+
+The classifier is pure heuristics (keywords + length), evaluated in this order:
+
+1. **Planning** ("planifica", "desglosa en tareas", "hoja de ruta", "roadmap") →
+   `complex` → **Claude first**. This is the "invent something new" case.
+2. **Explicit `/tool …` invocations** and **node commands** (a node name +
+   infra word, or `run_on_node`) → `general` → **local `qwen3.5:4b`**, Claude only
+   as fallback. Deliberately *not* the coder: a small coding model tends to answer
+   with text instead of calling the tool.
+3. **Coding** (code fences, stack traces, language/tooling keywords) → `coding`.
+4. **Reasoning** ("por qué", "calcula", "paso a paso", "demuestra") → `reasoning`.
+5. Very long input (>800 chars) → `complex`; short greetings → `trivial`;
+   everything else → `general`.
 
 Notes on the 8 GB ceiling for omarchy:
 - `deepseek-r1:8b` (~5.2 GB) and `qwen3:8b` (~5 GB) fit comfortably.

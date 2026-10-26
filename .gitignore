@@ -222,3 +222,8 @@ __marimo__/
 .env.*.local
 node_modules/
 
+
+# Piper voice models (large binaries — download per host, don't version)
+voice-services/voices/
+*.onnx
+*.onnx.json

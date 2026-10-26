@@ -21,9 +21,16 @@ hot-reloads** — no rebuild for manifest-only changes.
   },
   "endpoint": { "type": "n8n_webhook", "path": "/tool/create_task" },
   "channels": ["dashboard", "telegram"], // where it's offered/shown
+  "category": "Linear",                  // groups it in the UI (see below)
   "icon": "check-square"                 // capabilities panel
 }
 ```
+
+**`category`** groups the tool in the dashboard's **Capabilities** panel and in the
+`/` slash-command autocomplete. Use an existing one so it lands in a known group:
+`Linear`, `Calendar`, `Notes / Brain`, `Web`, `Homelab`, `Files`, `Nodes`.
+Anything else (or a missing category) falls into `Other`. Keep category names in
+English — they are shown verbatim, not translated by the ES/EN toggle.
 
 ## Endpoint types
 

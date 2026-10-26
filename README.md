@@ -340,3 +340,4 @@ Productivity_Tools/
 | [`docs/ADDING_A_TOOL.md`](docs/ADDING_A_TOOL.md) | How to add a capability (n8n webhook / Hermes / builtin / http). |
 | [`docs/FILES_NEXTCLOUD_PLAN.md`](docs/FILES_NEXTCLOUD_PLAN.md) | Files integration + the node-distribution plan. |
 | [`docs/STATE_OF_THE_ART_2026.md`](docs/STATE_OF_THE_ART_2026.md) | Local-model landscape review (Sep 2026) and upgrade candidates. |
+| [`docs/PHASE1_DASHBOARD.md`](docs/PHASE1_DASHBOARD.md) | Historical — the original Phase 1 breakdown. |

@@ -21,9 +21,12 @@ viewers).
 | **PostgreSQL** | postgres:16 | `5432` | `n8n_network` | n8n data + assistant-core chat sessions/messages. |
 | **Qdrant** | qdrant | `6333` | `n8n_network` | Vector DB for RAG over the second brain. |
 | **SearXNG** | searxng | `8080` | `n8n_network` | Self-hosted metasearch for the `web_search` tool. |
-| **Ollama** | external | `11434` | tailnet (sadida) | Local LLM (fallback) + embeddings (`nomic-embed-text`). |
-| **Whisper (STT)** | external | `8100` | tailnet (omarchy/sadida) | Speech-to-text. |
-| **Piper (TTS)** | external | `8200` | tailnet (omarchy/sadida) | Text-to-speech. |
+| **Ollama** | external | `11434` | tailnet (sadida, omarchy) | Local LLMs (task router) + embeddings (`nomic-embed-text`). |
+| **Whisper (STT)** | external | `8100` | tailnet (omarchy/sadida) | Speech-to-text, preference-ordered with failover. |
+| **Piper (TTS)** | external | `8200` | tailnet (omarchy/sadida) | Text-to-speech, same failover. |
+| **Nextcloud** | external | — | tailnet (aery) | File storage; WebDAV + OCS for the Files widget/tools. |
+| **Prometheus** | external | `9090` | tailnet (ocra) | Homelab metrics for the Homelab widget + `query_metrics`. |
+| **Homelab nodes** | external | `22` | tailnet | SSH targets (`ocra`, `sadida`, `omarchy`, `aery`, `sram`, `sacro`, `xelor`) for the hub terminal + `run_on_node`. |
 
 Clients: the **dashboard** (browser on the tailnet), the **Galaxy Watch**
 (Samsung Internet over the public Funnel), and **Telegram** (text + voice notes).
@@ -58,9 +61,15 @@ flowchart TB
   end
 
   subgraph gpu[GPU hosts over tailnet]
-    ollama[Ollama :11434<br/>sadida]
+    ollama[Ollama :11434<br/>sadida + omarchy]
     whisper[Whisper :8100<br/>omarchy/sadida]
     piper[Piper :8200<br/>omarchy/sadida]
+  end
+
+  subgraph ext[Other tailnet services]
+    nc[Nextcloud · aery<br/>WebDAV / OCS]
+    prom[Prometheus · ocra :9090]
+    nodes[Homelab nodes · SSH :22]
   end
 
   dash --> serve8443 --> ac
@@ -75,10 +84,27 @@ flowchart TB
   ac -->|LLM + embeddings| ollama
   ac --> whisper
   ac --> piper
+  ac --> nc
+  ac --> prom
+  ac --> nodes
   n8n -->|X-Internal-Token| ac
   n8n --> hermes
   hermes --> ollama
 ```
+
+### HTTP API surface (assistant-core)
+
+| Area | Routes |
+|---|---|
+| Health / meta | `GET /health`, `GET /tools`, `GET /models`, `GET /nodes`, `GET /nodes/status` |
+| Chat | `POST /chat`, `POST /chat/stream`, `GET /chat/history`, `GET /chat/sessions`, `POST /chat/session/rename` |
+| Tools | `POST /tools/invoke` |
+| Voice | `POST /voice/transcribe`, `POST /voice/speak` |
+| Widgets | `GET /widgets/calendar`, `GET /widgets/brain-graph`, `GET /widgets/homelab` |
+| Files (Nextcloud) | `GET /files/list`, `GET /files/download`, `GET /files/storage`, `POST /files/upload`, `POST /files/mkdir`, `POST /files/move`, `POST /files/delete`, `POST /files/share` |
+| Brain / RAG | `POST /brain/reindex`, `POST /brain/index-note` |
+| Nodes | `GET /ssh/:node` (WebSocket PTY) |
+| Auth / pages | `GET /auth/login`, `/auth/callback`, `/auth/logout`, `/auth/me`, `GET /watch` |
 
 Because assistant-core, n8n and Hermes **share the Tailscale container's network
 namespace** (`network_mode: service:tailscale`), they reach each other on
@@ -120,14 +146,17 @@ the browser mic (`getUserMedia`, secure-context only) works on both.
 sequenceDiagram
   participant B as Browser (dashboard)
   participant AC as assistant-core
-  participant LLM as LLM (Anthropic / Ollama)
+  participant LLM as LLM (local Ollama / Claude)
   participant T as Tool backend
-  B->>AC: POST /chat/stream (session_id, message) [cookie: rebeca_session]
+  B->>AC: POST /chat/stream (session_id, message, model?) [cookie: rebeca_session]
   Note over AC: auth gate validates the Google session cookie
   AC->>AC: load session context from Postgres
-  loop agent loop (max steps)
+  AC->>AC: classify turn -> failover chain (or forced model)
+  AC-->>B: SSE route (category)
+  loop agent loop (max 8 steps)
     AC->>LLM: messages + system + tool definitions
     LLM-->>AC: text and/or tool_use calls
+    AC-->>B: SSE model (provider/model/host)
     alt tool calls
       AC->>T: dispatch (builtin / hermes / n8n webhook)
       T-->>AC: result
@@ -140,41 +169,63 @@ sequenceDiagram
   AC->>AC: persist turns to Postgres
 ```
 
-The LLM adapter (`llm.js`) uses **Anthropic (Claude) as primary and Ollama on
-sadida as fallback**. Tool calls are dispatched by type (§6).
+### Model routing (`router.js` + `llm.js`)
+
+A **heuristic classifier** (keywords + length, no inference spent) maps the turn to
+a category, and each category has an ordered **failover chain** across hosts.
+Ollama hosts are health-gated (`GET /api/tags`, 1.5 s) so a powered-off host is
+skipped instantly; on failure the next target is tried.
+
+| Category | Chain |
+|---|---|
+| trivial | `qwen3:1.7b` (sadida) → `qwen3.5:4b` → Claude |
+| general · explicit `/tool` · node commands | `qwen3.5:4b` (sadida) → Claude |
+| reasoning | `deepseek-r1:8b` (omarchy) → `deepseek-r1:1.5b` (sadida) → Claude |
+| coding | `qwen2.5-coder:7b` (omarchy) → `qwen2.5-coder:3b` (sadida) → Claude |
+| planning / compose-new | Claude → `qwen3.5:4b` |
+
+`GET /models` auto-discovers what each host has pulled; the dashboard's model
+picker can force any of them (no fallback, for A/B testing) and doubles as the
+"which model answered" indicator. Full detail: [MODEL_ROUTING.md](./MODEL_ROUTING.md).
 
 ---
 
-## 4. Request flow — Telegram (text + voice)
+## 4. Request flow — Telegram (Brain workflow v3, hybrid)
+
+The Telegram entry point is **thrifty by design**: explicit `/task` and `/note` are
+dispatched straight to the tool with **zero AI**; everything else goes to Rebeca,
+whose own router keeps the paid model as a last resort.
 
 ```mermaid
 sequenceDiagram
   participant TG as Telegram
   participant F as Funnel :443
-  participant N as n8n (Brain workflow)
+  participant N as n8n (Brain workflow v3)
   participant AC as assistant-core
   participant W as Whisper
   TG->>F: webhook (message)
   F->>N: POST /webhook (:5678)
-  alt slash command (/task, /note, /calendar...)
-    N->>N: Router → tool sub-workflow
-  else voice note
+  opt voice note
     N->>N: download voice file
     N->>AC: POST /voice/transcribe [X-Internal-Token]
     AC->>W: audio → text
     W-->>AC: transcript
     AC-->>N: text
-    N->>AC: POST /chat (text) [X-Internal-Token]
-    AC-->>N: response
-  else free-form text
+  end
+  alt /task or /note (deterministic, no AI)
+    N->>AC: POST /tools/invoke {name, input} [X-Internal-Token]
+    AC-->>N: tool result
+  else free text · voice · /plan /calendar /brain /web
     N->>AC: POST /chat (text) [X-Internal-Token]
     AC-->>N: response
   end
-  N-->>TG: reply
+  N-->>TG: reply (or a short error message)
 ```
 
 n8n calls into assistant-core with the **`X-Internal-Token`** header, which
-bypasses the Google OAuth gate (service-to-service; see §5).
+bypasses the Google OAuth gate (service-to-service; see §5). Every HTTP node is set
+to **continue on error** and the format nodes build a short `⚠️ Error: …` message,
+so a failure never ends in silence.
 
 ---
 
@@ -260,15 +311,36 @@ dispatches calls by `endpoint.type`:
 ```mermaid
 flowchart TD
   call[LLM tool call] --> type{endpoint.type}
-  type -->|builtin| bi[in-process JS<br/>search_brain_semantic, web_search]
+  type -->|builtin| bi[in-process JS<br/>RAG · web · metrics · files · node SSH · plan]
   type -->|hermes_tool| hm[Hermes gateway :8080<br/>note_save, brain_list]
-  type -->|n8n_webhook| nw[n8n webhook :5678<br/>create_task, create_event, list_today_events]
+  type -->|n8n_webhook| nw[n8n webhook :5678<br/>Linear + Google Calendar]
   type -->|http| ht[any URL]
 ```
 
-Current tools: `create_task`, `create_event`, `list_today_events` (n8n) ·
-`save_note`, `search_brain` (Hermes) · `search_brain_semantic`, `web_search`
-(builtin). Adding a tool is documented in [ADDING_A_TOOL.md](./ADDING_A_TOOL.md).
+Each descriptor also carries a **`category`**, which groups it in the dashboard's
+Capabilities panel and in the `/` autocomplete.
+
+| Category | Tools | Dispatch |
+|---|---|---|
+| **Linear** | `create_task`, `create_plan`, `create_project`, `list_tasks`, `list_projects`, `update_task`, `complete_task` | n8n (`create_plan` is a builtin that orchestrates the others) |
+| **Calendar** | `create_event`, `list_today_events` | n8n |
+| **Notes / Brain** | `save_note`, `search_brain` · `search_brain_semantic` | Hermes · builtin (RAG) |
+| **Web** | `web_search` | builtin → SearXNG |
+| **Homelab** | `query_metrics` | builtin → Prometheus |
+| **Files** | `list_files`, `create_folder`, `move_file`, `delete_file`, `share_file`, `storage_usage` | builtin → Nextcloud |
+| **Nodes** | `run_on_node` | builtin → SSH |
+
+The dashboard can also invoke any tool directly via **`POST /tools/invoke`** (used
+by the task widget, the Files widget and the Ctrl-K command palette).
+
+Two behavioral guardrails live in the system prompt + tool layer:
+- **Planning** proposes the plan (project, parent, subtasks) and waits for the
+  user's approval before calling `create_plan` once.
+- **`run_on_node`** runs read-only commands directly, but refuses state-changing
+  ones unless `confirm:true` — which the model may only send after showing the
+  exact command and getting explicit approval.
+
+Adding a tool is documented in [ADDING_A_TOOL.md](./ADDING_A_TOOL.md).
 
 ---
 
@@ -304,6 +376,49 @@ flowchart LR
   ws --> ac[cleaned results + instant answer]
 ```
 
+### Files (Nextcloud)
+
+`nextcloud.js` speaks **WebDAV** (PROPFIND/GET/PUT/MKCOL/MOVE/DELETE) and **OCS**
+(share links, quota) with an **app password** kept server-side, so the browser
+never sees credentials and there is no CORS problem.
+
+| Route | Used by | WebDAV/OCS |
+|---|---|---|
+| `GET /files/list?path=` | widget, `list_files` | PROPFIND depth 1 |
+| `GET /files/download?path=` | widget | GET (streamed back) |
+| `POST /files/upload?path=&name=` | widget drag & drop | PUT |
+| `POST /files/mkdir` · `/files/move` · `/files/delete` | widget, tools | MKCOL · MOVE · DELETE |
+| `POST /files/share` | widget, `share_file` | OCS share → public link |
+| `GET /files/storage` | `storage_usage` | OCS quota |
+
+### Homelab metrics
+
+`metrics.js` runs **PromQL** against Prometheus. `GET /widgets/homelab` returns
+per-service health (one entry per host for multi-host services like Ollama,
+Whisper and Piper) plus per-node panels (CPU, RAM, Disk, GPU, VRAM) built from
+`node:cpu_utilization:ratio`, `node:memory_utilization:ratio`,
+`node_filesystem_*` and `nvidia_smi_*`. Override the panels with `METRICS_PANELS`.
+
+### Node access (SSH)
+
+```mermaid
+flowchart LR
+  term[Dashboard terminal<br/>xterm.js] -->|WebSocket /ssh/:node| ptty[openShell PTY]
+  tool[run_on_node tool] --> exec[execOnNode one-shot]
+  ptty --> ssh[(ssh2 · user 'rebeca' + dedicated key)]
+  exec --> ssh
+  ssh --> nodes[ocra · sadida · omarchy · aery · sram · sacro · xelor]
+```
+
+- Connects as a **dedicated non-root user** (`rebeca`, in the `docker` group) with a
+  dedicated key, over the tailnet, only to nodes in the registry.
+- `GET /nodes` lists the registry; `GET /nodes/status` does a quick TCP :22 probe
+  for the terminal's green/red lights.
+- Disabled unless `NODE_SSH_ENABLED=true` and the key is mounted at
+  `/app/.ssh/nodes_key`.
+- Commands are classified read-only vs mutating (`isReadOnly`), including rejecting
+  chained commands that hide a mutation behind a safe prefix.
+
 ---
 
 ## 8. Persistence
@@ -313,7 +428,8 @@ flowchart LR
 | **PostgreSQL** | `chat_session`, `chat_message` | Per-channel conversation memory; migration retries on cold boot. |
 | **Qdrant** | `brain` collection (vectors) | RAG over the vault; 768-dim (`nomic-embed-text`). |
 | **Second brain (git)** | Markdown vault | Written by Hermes `note_save`, pushed to GitHub. |
-| **`.env`** | secrets | OAuth, internal token, watch token, DB password, TS authkey. Never committed. |
+| **Nextcloud (aery)** | user files | Reached over WebDAV/OCS with an app password. |
+| **`.env`** | secrets | OAuth, internal token, watch token, DB password, TS authkey, Nextcloud app password, SSH key path. Never committed. |
 | **Tailscale state volume** | Serve/Funnel config, node identity | Survives restarts. |
 
 ---
@@ -325,4 +441,21 @@ flowchart LR
 | Dashboard | Serve `:8443` (tailnet) | Google OAuth | mic push-to-talk + TTS |
 | Watch | Funnel `:10000` (public) | Watch token | mic push-to-talk + TTS |
 | Telegram | Funnel `:443` → n8n | Internal token | voice notes in; text out |
-```
+
+---
+
+## 10. Dashboard surface
+
+One page (`public/index.html`), everything behind the OAuth gate:
+
+- **Chat** — SSE streaming with rendered markdown (tables, code), "thinking"
+  indicator, push-to-talk mic + TTS, conversation switcher (search, rename),
+  `/` slash-command autocomplete grouped by category with hover help, and a
+  **Ctrl-K command palette** that can run any tool with a small form.
+- **Model picker** — combined selector + "which model answered" indicator.
+- **Widgets** — upcoming events, tasks (grouped by project, subtasks nested, with
+  an expanded manager modal for inline edits), homelab (services + per-node
+  resources), second brain graph (search + center), capabilities, files.
+- **Node terminal** — xterm.js over the `/ssh/:node` WebSocket, with per-node
+  status lights.
+- **i18n** — ES/EN toggle for the whole UI, persisted in `localStorage`.

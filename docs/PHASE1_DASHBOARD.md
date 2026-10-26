@@ -1,5 +1,10 @@
 # Phase 1 — Dashboard + Interactive Text Chat (breakdown)
 
+> ⚠️ **Historical document.** Phase 1 is DONE and the system has moved well past it
+> (voice, RAG, model routing, files, nodes…). Kept for the original reasoning only.
+> For the current state see [ARCHITECTURE.md](./ARCHITECTURE.md) and
+> [REBECA_ROADMAP.md](./REBECA_ROADMAP.md).
+
 Goal: a self-hosted, **tailnet-only** web dashboard where Sebastian can chat with the
 assistant (streaming text), see today's calendar, explore the second-brain graph, and
 see the available capabilities/health. Both the dashboard and Telegram free-text share
