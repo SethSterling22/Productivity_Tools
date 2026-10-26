@@ -351,6 +351,38 @@ const TOOLS = {
     return `Note saved: ${subdir}/${filename} (added "${line}" · ${total} item(s) this month · ${synced})`;
   },
 
+  // Pull the brain repo so Hermes' clone matches GitHub (notes edited from
+  // Obsidian on the phone/other devices). Reports whether anything changed, so a
+  // scheduler can reindex the RAG only when needed.
+  brain_pull: async () => {
+    const head = async () => (await brainGit(["rev-parse", "HEAD"])).stdout.trim();
+    const before = await head();
+    try {
+      await brainGit(["pull", "--rebase", BRAIN_GIT_REMOTE, BRAIN_GIT_BRANCH]);
+    } catch (err) {
+      // Most likely a rebase conflict (same file edited here and remotely).
+      try { await brainGit(["rebase", "--abort"]); } catch { /* nothing to abort */ }
+      throw new Error(`brain pull failed: ${err.message.slice(0, 300)}`);
+    }
+    const after = await head();
+    const changed = before !== after;
+    let files = [];
+    if (changed) {
+      const { stdout } = await brainGit(["diff", "--name-only", `${before}..${after}`]);
+      files = stdout.split("\n").map(s => s.trim()).filter(Boolean);
+    }
+    return JSON.stringify({
+      ok: true,
+      changed,
+      files,
+      count: files.length,
+      head: after.slice(0, 7),
+      result: changed
+        ? `Brain updated: ${files.length} file(s) changed (${after.slice(0, 7)})`
+        : "Brain already up to date",
+    });
+  },
+
   // Read-only view of the second brain: a folder/file tree of the vault.
   // Lists directories and .md notes (skips .git). Never writes anything.
   // If HERMES_BRAIN_WEB_URL is set (e.g. https://github.com/user/Brain), each

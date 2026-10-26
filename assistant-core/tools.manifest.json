@@ -175,6 +175,15 @@
       "icon": "list-todo"
     },
     {
+      "name": "brain_pull",
+      "description": "Sync the local copy of the second brain with GitHub (git pull). Use when the user edited notes from Obsidian on another device and wants Rebeca to see them now, or when a brain search/graph looks out of date. A scheduler already does this every 15 minutes, so only call it on explicit request.",
+      "input_schema": { "type": "object", "properties": {} },
+      "endpoint": { "type": "hermes_tool", "path": "/tool/brain_pull" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Notes / Brain",
+      "icon": "refresh-cw"
+    },
+    {
       "name": "search_brain",
       "description": "Browse the second brain: return the folder/note tree, optionally within a subfolder.",
       "input_schema": {
