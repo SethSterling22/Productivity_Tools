@@ -155,9 +155,11 @@ export async function dispatch(name, input) {
     if (!res.ok) return { ok: false, error: `Tool ${name} HTTP ${res.status}`, body };
     // Auto-index a saved note into Qdrant (fire-and-forget) so semantic search
     // stays fresh without a manual /brain/reindex.
-    if (name === "save_note" && body && body.ok !== false) {
-      const m = /Note saved:\s*(\S+\.md)/.exec(body.result || "");
-      if (m) rag.indexNoteByPath(m[1]).catch(() => {});
+    if ((name === "save_note" || name === "quick_note") && body && body.ok !== false) {
+      // Non-greedy up to ".md" so paths containing spaces (e.g. "Quick Notes/2026-10.md")
+      // are captured too.
+      const m = /Note saved:\s*"?(.+?\.md)"?[\s(]/.exec((body.result || "") + " ");
+      if (m) rag.indexNoteByPath(m[1].trim()).catch(() => {});
     }
     return body;
   } catch (err) {

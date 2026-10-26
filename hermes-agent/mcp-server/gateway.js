@@ -271,6 +271,72 @@ const TOOLS = {
     return `Note saved: ${subdir}/${filename} (${synced})`;
   },
 
+  // Append one checklist line to the CURRENT MONTH's quick-notes file, creating
+  // it (and a per-day heading) on demand. One file per month keeps short captures
+  // like "watch a movie" / "buy food" together instead of one note per thought.
+  quick_note: async ({ text, folder, sync }) => {
+    const line = String(text || "").trim().replace(/\s+/g, " ");
+    if (!line) throw new Error("quick_note needs 'text'");
+
+    const now    = new Date();
+    const tz     = process.env.HERMES_TZ || "America/Puerto_Rico";
+    // Local (tz-aware) date parts, so a late-night note lands on the right day.
+    const ymd    = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now); // YYYY-MM-DD
+    const month  = ymd.slice(0, 7);                                  // YYYY-MM
+    const monthName = new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "long", year: "numeric" }).format(now);
+    const dayName   = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(now);
+
+    const subdir   = (folder || "Quick Notes").replace(/[^A-Za-z0-9/_ -]/g, "");
+    const dir      = path.join(BRAIN_ROOT, subdir);
+    const filename = `${month}.md`;
+    const outPath  = path.join(dir, filename);
+
+    await fs.mkdir(dir, { recursive: true });
+
+    // Create the monthly file the first time it is used.
+    let existing = "";
+    try { existing = await fs.readFile(outPath, "utf8"); } catch { /* new month */ }
+    if (!existing) {
+      existing = [
+        "---",
+        `title: ${JSON.stringify(`Quick Notes — ${monthName}`)}`,
+        `created: ${now.toISOString()}`,
+        'tags: ["quick-notes"]',
+        "source: cerebro",
+        "---",
+        "",
+        `# Quick Notes — ${monthName}`,
+        "",
+      ].join("\n");
+    }
+
+    // One heading per day, added only when the day's heading isn't there yet.
+    const dayHeading = `## ${ymd} · ${dayName}`;
+    let out = existing.endsWith("\n") ? existing : existing + "\n";
+    if (!out.includes(dayHeading)) {
+      if (!out.endsWith("\n\n")) out += "\n";   // blank line before the heading
+      out += `${dayHeading}\n\n`;
+    }
+    out += `- [ ] ${line}\n`;
+
+    await fs.writeFile(outPath, out, "utf8");
+
+    const doSync = sync === undefined ? BRAIN_GIT_SYNC : bool(String(sync));
+    let synced = "local-only";
+    if (doSync) {
+      try {
+        await brainGit(["add", "--", outPath]);
+        await brainGit(["commit", "-m", `quick note: ${line.slice(0, 60)}`]);
+        await brainGit(["push", BRAIN_GIT_REMOTE, BRAIN_GIT_BRANCH]);
+        synced = `pushed to ${BRAIN_GIT_REMOTE}/${BRAIN_GIT_BRANCH}`;
+      } catch (err) {
+        synced = `saved locally, git sync failed: ${err.message}`;
+      }
+    }
+    const total = (out.match(/^- \[[ xX]\] /gm) || []).length;
+    return `Note saved: ${subdir}/${filename} (added "${line}" · ${total} item(s) this month · ${synced})`;
+  },
+
   // Read-only view of the second brain: a folder/file tree of the vault.
   // Lists directories and .md notes (skips .git). Never writes anything.
   // If HERMES_BRAIN_WEB_URL is set (e.g. https://github.com/user/Brain), each

@@ -159,6 +159,22 @@
       "icon": "file-plus"
     },
     {
+      "name": "quick_note",
+      "description": "Append ONE short item to the current month's quick-notes checklist in the second brain (one file per month, with a heading per day). Use this for brief captures and to-remember one-liners — 'watch a movie', 'watch The Odyssey', 'buy food', 'idea: ...'. Prefer this over save_note whenever the user is jotting a short thought rather than writing an actual document; save_note is for real notes with a body. Not for actionable work items with a deadline/project — those go to Linear via create_task.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "The single line to add (short)." },
+          "folder": { "type": "string", "description": "Optional folder, defaults to 'Quick Notes'." }
+        },
+        "required": ["text"]
+      },
+      "endpoint": { "type": "hermes_tool", "path": "/tool/quick_note" },
+      "channels": ["dashboard", "telegram"],
+      "category": "Notes / Brain",
+      "icon": "list-todo"
+    },
+    {
       "name": "search_brain",
       "description": "Browse the second brain: return the folder/note tree, optionally within a subfolder.",
       "input_schema": {
