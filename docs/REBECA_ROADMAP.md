@@ -255,6 +255,21 @@ that makes the assistant "adapt easily to any future n8n tool."
   help, command palette (Ctrl-K), ES/EN i18n, "thinking" indicator, mobile overflow
   fixes and a scrollable watch reply.
 
+### Future ideas (not scheduled)
+
+- **Phone capabilities via the Termux API.** Termux exposes Android primitives
+  (`termux-battery-status`, `-location`, `-sms-send`, `-notification`, `-camera-photo`,
+  `-clipboard`, `-tts-speak`, `-sensor`…) over a local CLI/HTTP shim. Exposed as
+  tools, Rebeca could read the phone's state, send notifications, or use it as a
+  roaming sensor. Same pattern as the node tier: the phone joins the tailnet, runs a
+  tiny token-protected agent, and gets its own scoped capability list. Capabilities
+  still **to be defined**.
+- **Robot assistant (Raspberry Pi Pico + sensors/displays).** A physical embodiment:
+  the Pico handles the real-time layer (sensors, motors, screen) and talks to Rebeca
+  over serial/MQTT/Wi-Fi for anything that needs language or memory. Opens the
+  robotics side of the project — sensor fusion, actuation, and an on-device wake word
+  would finally have a home.
+
 ---
 
 ## 8. Proposed tech stack
