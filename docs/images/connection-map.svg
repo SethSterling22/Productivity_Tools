@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1620 1045" width="1620" height="1045">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#71716a"/></marker></defs>
+<rect width="1620" height="1045" fill="#0d0d0d"/>
+<text x="40" y="46" font-family="DejaVu Sans Mono, monospace" font-size="25" fill="#ededed" font-weight="bold">REBECA — connection map</text>
+<text x="40" y="70" font-family="DejaVu Sans Mono, monospace" font-size="13.5" fill="#8f8f84">self-hosted assistant · channels, LLMs, data stores, APIs and homelab nodes</text>
+<rect x="530" y="98" width="560" height="98" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="544" y="121" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">CHANNELS</text>
+<rect x="550" y="128" width="160" height="54" rx="4" fill="#161616" stroke="#f27e63" stroke-width="1.3"/>
+<text x="630.0" y="152" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Telegram</text>
+<text x="630.0" y="171" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">text + voice</text>
+<rect x="730" y="128" width="160" height="54" rx="4" fill="#161616" stroke="#f27e63" stroke-width="1.3"/>
+<text x="810.0" y="152" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Galaxy Watch</text>
+<text x="810.0" y="171" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">voice-first</text>
+<rect x="910" y="128" width="160" height="54" rx="4" fill="#161616" stroke="#f27e63" stroke-width="1.3"/>
+<text x="990.0" y="152" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Dashboard</text>
+<text x="990.0" y="171" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">browser</text>
+<rect x="440" y="236" width="740" height="106" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="454" y="259" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">TAILSCALE EDGE — OCRA-N8N</text>
+<rect x="460" y="268" width="220" height="58" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="570.0" y="292" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Funnel :443</text>
+<text x="570.0" y="311" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">public · Telegram webhook</text>
+<rect x="700" y="268" width="220" height="58" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="810.0" y="292" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Funnel :10000</text>
+<text x="810.0" y="311" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">public · watch token</text>
+<rect x="940" y="268" width="220" height="58" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="1050.0" y="292" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Serve :8443</text>
+<text x="1050.0" y="311" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">tailnet · Google OAuth</text>
+<rect x="400" y="386" width="820" height="152" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="414" y="409" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">CORE SERVICES — DOCKER · OCRA</text>
+<rect x="420" y="418" width="230" height="76" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="535.0" y="440" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">n8n</text>
+<text x="535.0" y="459" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">Telegram router</text>
+<text x="535.0" y="476" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">tool webhooks</text>
+<rect x="690" y="418" width="250" height="76" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="815.0" y="440" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">assistant-core</text>
+<text x="815.0" y="459" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">Rebeca — agent loop</text>
+<text x="815.0" y="476" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">model router · auth gate</text>
+<rect x="980" y="418" width="220" height="76" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="1090.0" y="442" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Hermes gateway</text>
+<text x="1090.0" y="461" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">brain · fs · shell</text>
+<text x="700" y="522" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">n8n &#8646; assistant-core · webhooks :5678 / X-Internal-Token</text>
+<text x="1090" y="522" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">assistant-core &#8594; Hermes · localhost :8080</text>
+<rect x="40" y="600" width="470" height="215" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="54" y="623" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">LLMS — TASK ROUTER, LOCAL-FIRST</text>
+<rect x="60" y="640" width="430" height="54" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="275.0" y="664" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Ollama · omarchy (8 GB)</text>
+<text x="275.0" y="683" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">qwen3:8b · deepseek-r1:8b · qwen2.5-coder:7b</text>
+<rect x="60" y="704" width="430" height="54" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="275.0" y="728" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Ollama · Sadida (4 GB)</text>
+<text x="275.0" y="747" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">qwen3:1.7b · deepseek-r1:1.5b · qwen2.5-coder:3b</text>
+<rect x="60" y="762" width="430" height="48" rx="4" fill="#161616" stroke="#f27e63" stroke-width="1.3"/>
+<text x="275.0" y="786" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Claude API</text>
+<text x="275.0" y="805" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">claude-sonnet-5-5 — last resort</text>
+<rect x="545" y="600" width="290" height="215" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="559" y="623" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">DATA STORES</text>
+<rect x="565" y="640" width="250" height="62" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="690.0" y="662" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">PostgreSQL</text>
+<text x="690.0" y="681" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">chat memory</text>
+<text x="690.0" y="698" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">sessions</text>
+<rect x="565" y="718" width="250" height="62" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="690.0" y="742" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Qdrant</text>
+<text x="690.0" y="761" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">vectors — RAG 768d</text>
+<rect x="870" y="600" width="690" height="215" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="884" y="623" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">INTEGRATIONS &amp; APIS</text>
+<rect x="890" y="640" width="330" height="54" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="1055.0" y="664" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Linear API</text>
+<text x="1055.0" y="683" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">GraphQL — tasks · projects · subtasks</text>
+<rect x="1230" y="640" width="310" height="54" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="1385.0" y="664" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Google Calendar</text>
+<text x="1385.0" y="683" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">OAuth2 — events</text>
+<rect x="890" y="704" width="215" height="54" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="997.5" y="728" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">SearXNG</text>
+<text x="997.5" y="747" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">web search</text>
+<rect x="1115" y="704" width="215" height="54" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="1222.5" y="728" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Nextcloud · Aery</text>
+<text x="1222.5" y="747" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">WebDAV / OCS</text>
+<rect x="1340" y="704" width="200" height="54" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="1440.0" y="728" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Prometheus</text>
+<text x="1440.0" y="747" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">PromQL</text>
+<rect x="40" y="855" width="470" height="145" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="54" y="878" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">VOICE — SADIDA ONLY</text>
+<rect x="60" y="893" width="215" height="72" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="167.5" y="917" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Whisper STT</text>
+<text x="167.5" y="936" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">speech → text</text>
+<rect x="295" y="893" width="195" height="72" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="392.5" y="917" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Piper TTS</text>
+<text x="392.5" y="936" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">text → speech</text>
+<rect x="545" y="855" width="290" height="145" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="559" y="878" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">HOMELAB NODES — SSH</text>
+<rect x="565" y="893" width="250" height="72" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="690.0" y="915" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">7 nodes</text>
+<text x="690.0" y="934" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">ocra · sadida · omarchy · aery</text>
+<text x="690.0" y="951" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">sram · sacro · xelor</text>
+<rect x="870" y="855" width="690" height="145" rx="6" fill="#111111" stroke="#2e2e2e" stroke-width="1.2"/>
+<text x="884" y="878" font-family="DejaVu Sans Mono, monospace" font-size="13" fill="#8f8f84" letter-spacing="1.5">SECOND BRAIN</text>
+<rect x="890" y="893" width="310" height="72" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="1045.0" y="915" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">Git vault (Markdown)</text>
+<text x="1045.0" y="934" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">Obsidian vault</text>
+<text x="1045.0" y="951" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">auto-indexed → Qdrant</text>
+<rect x="1240" y="893" width="300" height="72" rx="4" fill="#161616" stroke="#bcbf56" stroke-width="1.3"/>
+<text x="1390.0" y="915" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="15" fill="#ededed" font-weight="bold">GitHub</text>
+<text x="1390.0" y="934" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">two-way sync</text>
+<text x="1390.0" y="951" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">every 15 min</text>
+<path d="M 630.0 182 L 630.0 220 L 570.0 220 L 570.0 268" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 810.0 182 L 810.0 220 L 810.0 220 L 810.0 268" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 990.0 182 L 990.0 220 L 1050.0 220 L 1050.0 268" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 570.0 326 L 570.0 368 L 535.0 368 L 535.0 418" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 810.0 326 L 810.0 368 L 815.0 368 L 815.0 418" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 1050.0 326 L 1050.0 368 L 885.0 368 L 885.0 418" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 650 440 L 690 440" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 690 472 L 650 472" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 940 456 L 980 456" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<path d="M 740 538 L 740 565 L 275 565 L 275 600" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="345.9" y="554" width="168.2" height="21" rx="3" fill="#0d0d0d" stroke="#2e2e2e" stroke-width="0.8"/>
+<text x="430" y="569" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">/api/chat · embeddings</text>
+<path d="M 820 538 L 820 600" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="757.2" y="561" width="125.6" height="21" rx="3" fill="#0d0d0d" stroke="#2e2e2e" stroke-width="0.8"/>
+<text x="820" y="576" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">memory · vectors</text>
+<path d="M 900 538 L 900 578 L 1180 578 L 1180 600" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="985.9" y="567" width="168.2" height="21" rx="3" fill="#0d0d0d" stroke="#2e2e2e" stroke-width="0.8"/>
+<text x="1070" y="582" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">JSON · WebDAV · PromQL</text>
+<path d="M 490 538 L 490 558 L 1400 558 L 1400 600" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="1202.2" y="547" width="125.6" height="21" rx="3" fill="#0d0d0d" stroke="#2e2e2e" stroke-width="0.8"/>
+<text x="1265" y="562" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">GraphQL · OAuth2</text>
+<path d="M 780 538 L 780 542 L 20 542 L 20 929 L 60 929" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="276.25" y="531" width="47.5" height="21" rx="3" fill="#0d0d0d" stroke="#2e2e2e" stroke-width="0.8"/>
+<text x="300" y="546" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">audio</text>
+<path d="M 860 538 L 860 568 L 527 568 L 527 929 L 565 929" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="584.3" y="557" width="111.39999999999999" height="21" rx="3" fill="#0d0d0d" stroke="#2e2e2e" stroke-width="0.8"/>
+<text x="640" y="572" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">SSH exec / PTY</text>
+<path d="M 1200 456 L 1600 456 L 1600 929 L 1540 929" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+<rect x="1329.45" y="445" width="161.1" height="21" rx="3" fill="#0d0d0d" stroke="#2e2e2e" stroke-width="0.8"/>
+<text x="1410" y="460" text-anchor="middle" font-family="DejaVu Sans Mono, monospace" font-size="12.5" fill="#8f8f84">read/write + git push</text>
+<path d="M 1200 929 L 1240 929" fill="none" stroke="#71716a" stroke-width="1.6" marker-end="url(#ar)"/>
+</svg>
